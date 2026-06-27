@@ -67,7 +67,7 @@ A fully browser-based **OT/ICS Security Operations Center (SOC) simulator** insp
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR_USERNAME/ot-threat-lab.git
+git clone https://github.com/LAZYGENIUS18/ot-threat-lab.git
 
 # Open in browser — no server, no install needed
 cd ot-threat-lab
