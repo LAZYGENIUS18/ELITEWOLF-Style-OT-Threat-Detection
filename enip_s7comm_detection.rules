@@ -1,0 +1,113 @@
+# ============================================================
+# ELITEWOLF-Style Rules — EtherNet/IP (CIP) + S7comm
+# EtherNet/IP Port: 44818 | S7comm Port: 102
+# ============================================================
+
+# ══ ETHERNET/IP — CIP PROTOCOL ══════════════════════════════
+
+alert tcp any any -> $OT_NET 44818 (
+  msg:"OT-ENIP CIP Set Attribute Single - Parameter Modification";
+  flow:to_server,established;
+  content:"|65 00|"; depth:2;
+  content:"|10|"; offset:40; depth:1;
+  classtype:protocol-command-decode;
+  priority:2;
+  metadata:protocol enip, tactic Impact, technique T0836;
+  sid:9002001; rev:2;
+)
+
+alert tcp any any -> $OT_NET 44818 (
+  msg:"OT-ENIP CIP Set Attribute All - Bulk Configuration Change";
+  flow:to_server,established;
+  content:"|65 00|"; depth:2;
+  content:"|02|"; offset:40; depth:1;
+  classtype:protocol-command-decode;
+  priority:1;
+  metadata:protocol enip, tactic Impact, technique T0836;
+  sid:9002002; rev:1;
+)
+
+alert tcp any any -> $OT_NET 44818 (
+  msg:"OT-ENIP CIP Reset Service - Device Restart Command";
+  flow:to_server,established;
+  content:"|05|"; offset:40; depth:1;
+  classtype:denial-of-service;
+  priority:1;
+  metadata:protocol enip, tactic Impact, technique T0816;
+  sid:9002003; rev:1;
+)
+
+alert tcp any any -> $OT_NET 44818 (
+  msg:"OT-ENIP Rapid Connection Attempts - Possible Scanner";
+  flow:to_server;
+  threshold:type threshold,track by_src,count 20,seconds 10;
+  classtype:attempted-recon;
+  priority:2;
+  metadata:protocol enip, tactic Discovery, technique T0846;
+  sid:9002004; rev:1;
+)
+
+alert tcp $ENTERPRISE_NET any -> $OT_NET 44818 (
+  msg:"OT-ENIP Connection from Enterprise - IT/OT Boundary Violation";
+  flow:to_server,established;
+  classtype:policy-violation;
+  priority:1;
+  metadata:protocol enip, tactic LateralMovement, technique T0866;
+  sid:9002005; rev:1;
+)
+
+# ══ S7COMM — SIEMENS SIMATIC ═════════════════════════════════
+
+alert tcp any any -> $OT_NET 102 (
+  msg:"OT-S7COMM CPU Stop Command - STUXNET/Production Halt";
+  flow:to_server,established;
+  content:"|03 00|"; depth:2;
+  content:"|32|"; offset:6; depth:1;
+  content:"|29|"; offset:17; depth:1;
+  classtype:attempted-dos;
+  priority:1;
+  metadata:protocol s7comm, tactic Impact, technique T0816, malware STUXNET;
+  sid:9003001; rev:2;
+)
+
+alert tcp any any -> $OT_NET 102 (
+  msg:"OT-S7COMM Upload Program Block - Firmware/Logic Exfil";
+  flow:to_server,established;
+  content:"|03 00|"; depth:2;
+  content:"|1D|"; offset:17; depth:1;
+  classtype:protocol-command-decode;
+  priority:2;
+  metadata:protocol s7comm, tactic Collection, technique T0877;
+  sid:9003002; rev:1;
+)
+
+alert tcp any any -> $OT_NET 102 (
+  msg:"OT-S7COMM Download Program Block - Logic Modification";
+  flow:to_server,established;
+  content:"|03 00|"; depth:2;
+  content:"|1A|"; offset:17; depth:1;
+  classtype:protocol-command-decode;
+  priority:1;
+  metadata:protocol s7comm, tactic Execution, technique T0843;
+  sid:9003003; rev:1;
+)
+
+alert tcp any any -> $OT_NET 102 (
+  msg:"OT-S7COMM Connection from Unauthorized Source";
+  flow:to_server,established;
+  content:"|03 00|"; depth:2;
+  content:"|E0|"; offset:5; depth:1;
+  classtype:policy-violation;
+  priority:2;
+  metadata:protocol s7comm, tactic InitialAccess;
+  sid:9003004; rev:1;
+)
+
+alert tcp $ENTERPRISE_NET any -> $OT_NET 102 (
+  msg:"OT-S7COMM Enterprise-to-PLC Direct Connection";
+  flow:to_server,established;
+  classtype:policy-violation;
+  priority:1;
+  metadata:protocol s7comm, tactic LateralMovement, technique T0866;
+  sid:9003005; rev:1;
+)

@@ -1,0 +1,2186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ELITEWOLF-Style OT Threat Detection Lab</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Inter:wght@300;400;500;600;700&display=swap');
+
+  :root {
+    --bg-base: #0a0e17;
+    --bg-panel: #0f1520;
+    --bg-card: #131b2a;
+    --bg-hover: #1a2438;
+    --accent-green: #00ff88;
+    --accent-cyan: #00d4ff;
+    --accent-amber: #ffb800;
+    --accent-red: #ff3b5c;
+    --accent-purple: #a855f7;
+    --text-primary: #e2e8f0;
+    --text-secondary: #64748b;
+    --text-muted: #334155;
+    --border: #1e293b;
+    --border-bright: #2d3f5c;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'Inter', sans-serif;
+    --severity-critical: #ff3b5c;
+    --severity-high: #ff6b00;
+    --severity-medium: #ffb800;
+    --severity-low: #00d4ff;
+    --severity-info: #64748b;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg-base);
+    color: var(--text-primary);
+    font-family: var(--sans);
+    font-size: 13px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── TOP NAV ── */
+  .topnav {
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border);
+    padding: 0 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    height: 52px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    font-family: var(--mono);
+    font-size: 15px;
+    color: var(--accent-green);
+    letter-spacing: 2px;
+    white-space: nowrap;
+  }
+  .logo span { color: var(--text-secondary); font-size: 11px; }
+  .nav-tabs {
+    display: flex;
+    gap: 2px;
+    margin-left: 24px;
+    flex: 1;
+  }
+  .nav-tab {
+    padding: 6px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    transition: all 0.15s;
+    border: 1px solid transparent;
+    white-space: nowrap;
+  }
+  .nav-tab:hover { color: var(--text-primary); background: var(--bg-card); }
+  .nav-tab.active {
+    color: var(--accent-cyan);
+    background: rgba(0,212,255,0.08);
+    border-color: rgba(0,212,255,0.2);
+  }
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-left: auto;
+  }
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent-green);
+    box-shadow: 0 0 8px var(--accent-green);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .status-label { font-family: var(--mono); font-size: 11px; color: var(--accent-green); }
+  .clock { font-family: var(--mono); font-size: 12px; color: var(--text-secondary); }
+
+  /* ── MAIN LAYOUT ── */
+  .main { display: flex; height: calc(100vh - 52px); overflow: hidden; }
+  .sidebar {
+    width: 220px;
+    min-width: 220px;
+    background: var(--bg-panel);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 12px 0;
+  }
+  .sidebar-section { margin-bottom: 8px; }
+  .sidebar-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: 2px;
+    padding: 8px 16px 4px;
+    text-transform: uppercase;
+  }
+  .sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    cursor: pointer;
+    border-left: 2px solid transparent;
+    transition: all 0.15s;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+  .sidebar-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .sidebar-item.active { border-left-color: var(--accent-cyan); color: var(--text-primary); background: rgba(0,212,255,0.05); }
+  .sidebar-item .icon { font-size: 14px; width: 18px; text-align: center; }
+  .sidebar-badge {
+    margin-left: auto;
+    background: var(--severity-critical);
+    color: white;
+    font-size: 10px;
+    font-family: var(--mono);
+    padding: 1px 6px;
+    border-radius: 10px;
+    min-width: 20px;
+    text-align: center;
+  }
+  .sidebar-badge.amber { background: var(--severity-medium); color: #000; }
+  .sidebar-badge.green { background: var(--accent-green); color: #000; }
+
+  /* ── CONTENT AREA ── */
+  .content { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+
+  /* ── SECTION VISIBILITY ── */
+  .section { display: none; }
+  .section.active { display: contents; }
+
+  /* ── STAT CARDS ROW ── */
+  .stat-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
+  .stat-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px;
+    position: relative;
+    overflow: hidden;
+  }
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+  .stat-card.red::before { background: var(--severity-critical); }
+  .stat-card.orange::before { background: var(--severity-high); }
+  .stat-card.amber::before { background: var(--severity-medium); }
+  .stat-card.cyan::before { background: var(--accent-cyan); }
+  .stat-card.green::before { background: var(--accent-green); }
+  .stat-card.purple::before { background: var(--accent-purple); }
+  .stat-label { font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .stat-value { font-family: var(--mono); font-size: 26px; font-weight: bold; line-height: 1; }
+  .stat-card.red .stat-value { color: var(--severity-critical); }
+  .stat-card.orange .stat-value { color: var(--severity-high); }
+  .stat-card.amber .stat-value { color: var(--severity-medium); }
+  .stat-card.cyan .stat-value { color: var(--accent-cyan); }
+  .stat-card.green .stat-value { color: var(--accent-green); }
+  .stat-card.purple .stat-value { color: var(--accent-purple); }
+  .stat-sub { font-size: 10px; color: var(--text-muted); margin-top: 6px; }
+
+  /* ── GRID LAYOUTS ── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .grid-60-40 { display: grid; grid-template-columns: 60fr 40fr; gap: 12px; }
+  .grid-40-60 { display: grid; grid-template-columns: 40fr 60fr; gap: 12px; }
+
+  /* ── PANEL ── */
+  .panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .panel-header {
+    display: flex;
+    align-items: center;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(255,255,255,0.02);
+  }
+  .panel-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-secondary);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+  .panel-actions { margin-left: auto; display: flex; gap: 8px; }
+  .btn-xs {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 4px 10px;
+    border-radius: 3px;
+    border: 1px solid var(--border-bright);
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-xs:hover { color: var(--text-primary); border-color: var(--accent-cyan); }
+  .btn-xs.active { color: var(--accent-green); border-color: var(--accent-green); background: rgba(0,255,136,0.08); }
+  .btn-primary {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 7px 16px;
+    border-radius: 4px;
+    border: 1px solid var(--accent-green);
+    background: rgba(0,255,136,0.1);
+    color: var(--accent-green);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-primary:hover { background: rgba(0,255,136,0.2); }
+  .btn-danger {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 7px 16px;
+    border-radius: 4px;
+    border: 1px solid var(--severity-critical);
+    background: rgba(255,59,92,0.1);
+    color: var(--severity-critical);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-danger:hover { background: rgba(255,59,92,0.2); }
+
+  /* ── ALERTS TABLE ── */
+  .alert-table { width: 100%; border-collapse: collapse; }
+  .alert-table th {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .alert-table td { padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.03); vertical-align: middle; }
+  .alert-table tr:hover td { background: var(--bg-hover); cursor: pointer; }
+  .alert-row-new td { background: rgba(0,212,255,0.04); }
+
+  .sev-badge {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-weight: bold;
+    text-transform: uppercase;
+  }
+  .sev-critical { background: rgba(255,59,92,0.2); color: var(--severity-critical); border: 1px solid rgba(255,59,92,0.4); }
+  .sev-high { background: rgba(255,107,0,0.2); color: var(--severity-high); border: 1px solid rgba(255,107,0,0.4); }
+  .sev-medium { background: rgba(255,184,0,0.2); color: var(--severity-medium); border: 1px solid rgba(255,184,0,0.4); }
+  .sev-low { background: rgba(0,212,255,0.15); color: var(--accent-cyan); border: 1px solid rgba(0,212,255,0.3); }
+  .sev-info { background: rgba(100,116,139,0.2); color: var(--text-secondary); border: 1px solid rgba(100,116,139,0.3); }
+
+  .proto-tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: rgba(168,85,247,0.15);
+    color: var(--accent-purple);
+    border: 1px solid rgba(168,85,247,0.3);
+  }
+
+  /* ── TIMELINE / LOG ── */
+  .log-area {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 12px;
+    max-height: 260px;
+    overflow-y: auto;
+    line-height: 1.8;
+  }
+  .log-line { display: flex; gap: 10px; }
+  .log-ts { color: var(--text-muted); white-space: nowrap; }
+  .log-src { color: var(--accent-cyan); }
+  .log-msg { color: var(--text-secondary); flex: 1; }
+  .log-msg.alert { color: var(--severity-critical); }
+  .log-msg.warn { color: var(--severity-medium); }
+  .log-msg.ok { color: var(--accent-green); }
+
+  /* ── NETWORK TOPOLOGY ── */
+  .topology-canvas { width: 100%; height: 320px; position: relative; }
+  #topoSvg { width: 100%; height: 100%; }
+
+  /* ── RULE EDITOR ── */
+  .rule-editor {
+    font-family: var(--mono);
+    font-size: 12px;
+    background: #0a0f1a;
+    border: 1px solid var(--border-bright);
+    border-radius: 4px;
+    padding: 14px;
+    color: var(--accent-green);
+    width: 100%;
+    min-height: 200px;
+    resize: vertical;
+    line-height: 1.7;
+    outline: none;
+  }
+  .rule-editor:focus { border-color: var(--accent-cyan); }
+
+  /* ── MITRE TABLE ── */
+  .mitre-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; padding: 14px; }
+  .mitre-tactic {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 8px;
+  }
+  .mitre-tactic-name {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--accent-cyan);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 4px;
+  }
+  .mitre-tech {
+    font-size: 10px;
+    padding: 3px 5px;
+    border-radius: 3px;
+    margin-bottom: 3px;
+    cursor: pointer;
+    transition: all 0.15s;
+    color: var(--text-secondary);
+    border: 1px solid transparent;
+  }
+  .mitre-tech:hover { color: var(--text-primary); border-color: var(--border-bright); }
+  .mitre-tech.hit { background: rgba(255,59,92,0.15); color: var(--severity-critical); border-color: rgba(255,59,92,0.3); }
+  .mitre-tech.medium { background: rgba(255,184,0,0.12); color: var(--severity-medium); border-color: rgba(255,184,0,0.25); }
+
+  /* ── PROTOCOL DECODER ── */
+  .proto-fields { padding: 14px; }
+  .proto-field-row {
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    gap: 8px;
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    font-size: 12px;
+  }
+  .proto-field-name { font-family: var(--mono); color: var(--text-secondary); }
+  .proto-field-val { font-family: var(--mono); color: var(--accent-green); }
+  .proto-field-val.suspicious { color: var(--severity-critical); }
+  .proto-field-val.warn { color: var(--severity-medium); }
+
+  /* ── ASSET INVENTORY ── */
+  .asset-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 14px; }
+  .asset-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .asset-card:hover { border-color: var(--accent-cyan); }
+  .asset-card.compromised { border-color: rgba(255,59,92,0.5); background: rgba(255,59,92,0.05); }
+  .asset-icon { font-size: 22px; margin-bottom: 8px; }
+  .asset-name { font-family: var(--mono); font-size: 12px; color: var(--text-primary); margin-bottom: 4px; }
+  .asset-type { font-size: 10px; color: var(--text-secondary); margin-bottom: 6px; }
+  .asset-ip { font-family: var(--mono); font-size: 11px; color: var(--accent-cyan); }
+  .asset-status { font-size: 10px; margin-top: 6px; display: flex; align-items: center; gap: 4px; }
+  .dot-ok { width: 6px; height: 6px; border-radius: 50%; background: var(--accent-green); }
+  .dot-alert { width: 6px; height: 6px; border-radius: 50%; background: var(--severity-critical); animation: pulse 1s infinite; }
+  .dot-warn { width: 6px; height: 6px; border-radius: 50%; background: var(--severity-medium); }
+
+  /* ── INCIDENT REPORT ── */
+  .report-area { padding: 14px; }
+  .report-field { margin-bottom: 14px; }
+  .report-field label { display: block; font-family: var(--mono); font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+  .report-field input, .report-field textarea, .report-field select {
+    width: 100%;
+    background: #0a0f1a;
+    border: 1px solid var(--border-bright);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 8px 12px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .report-field input:focus, .report-field textarea:focus, .report-field select:focus { border-color: var(--accent-cyan); }
+  .report-field textarea { min-height: 100px; resize: vertical; }
+  .report-field select { cursor: pointer; }
+
+  /* ── MINI CHART ── */
+  .mini-chart { height: 60px; position: relative; overflow: hidden; }
+  canvas.sparkline { position: absolute; bottom: 0; left: 0; width: 100%; height: 100%; }
+
+  /* ── ALERT DETAIL MODAL ── */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--bg-card);
+    border: 1px solid var(--border-bright);
+    border-radius: 8px;
+    width: 680px;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+  .modal-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .modal-header h2 { font-family: var(--mono); font-size: 13px; color: var(--text-primary); flex: 1; }
+  .modal-close { background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 18px; }
+  .modal-body { padding: 20px; }
+  .detail-row { display: flex; gap: 12px; margin-bottom: 10px; font-size: 12px; }
+  .detail-key { font-family: var(--mono); color: var(--text-secondary); width: 160px; flex-shrink: 0; }
+  .detail-val { font-family: var(--mono); color: var(--text-primary); }
+  .detail-val.red { color: var(--severity-critical); }
+  .detail-val.cyan { color: var(--accent-cyan); }
+  .packet-hex {
+    font-family: var(--mono);
+    font-size: 11px;
+    background: #0a0f1a;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 12px;
+    color: var(--accent-green);
+    margin-top: 14px;
+    white-space: pre;
+    overflow-x: auto;
+  }
+  .ioc-list { margin-top: 14px; }
+  .ioc-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    font-size: 11px;
+    font-family: var(--mono);
+  }
+  .ioc-type { color: var(--text-muted); width: 80px; }
+  .ioc-val { color: var(--accent-cyan); }
+  .ioc-badge { margin-left: auto; }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #3d5275; }
+
+  /* ── SEARCH BAR ── */
+  .search-row {
+    display: flex;
+    gap: 8px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    align-items: center;
+  }
+  .search-input {
+    flex: 1;
+    background: #0a0f1a;
+    border: 1px solid var(--border-bright);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 6px 10px;
+    outline: none;
+  }
+  .search-input:focus { border-color: var(--accent-cyan); }
+  .filter-pill {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 4px 10px;
+    border-radius: 12px;
+    border: 1px solid var(--border-bright);
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .filter-pill:hover, .filter-pill.active { border-color: var(--accent-cyan); color: var(--accent-cyan); background: rgba(0,212,255,0.08); }
+
+  /* ── SIMULATION CONTROLS ── */
+  .sim-controls {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+  }
+  .sim-title { font-family: var(--mono); font-size: 13px; color: var(--accent-amber); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .scenario-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .scenario-btn {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: left;
+  }
+  .scenario-btn:hover { border-color: var(--accent-amber); }
+  .scenario-btn .s-name { font-family: var(--mono); font-size: 12px; color: var(--text-primary); margin-bottom: 4px; }
+  .scenario-btn .s-desc { font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; }
+  .scenario-btn .s-tags { display: flex; gap: 4px; flex-wrap: wrap; }
+  .s-tag { font-size: 10px; font-family: var(--mono); padding: 1px 6px; border-radius: 3px; }
+  .s-tag.modbus { background: rgba(0,212,255,0.1); color: var(--accent-cyan); }
+  .s-tag.dnp3 { background: rgba(168,85,247,0.1); color: var(--accent-purple); }
+  .s-tag.enip { background: rgba(255,107,0,0.1); color: var(--severity-high); }
+  .s-tag.ics { background: rgba(0,255,136,0.1); color: var(--accent-green); }
+
+  /* ── PROGRESS BAR ── */
+  .progress-bar-track {
+    width: 100%;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s;
+  }
+
+  /* ── PCAP VIEWER ── */
+  .pcap-table { width: 100%; border-collapse: collapse; }
+  .pcap-table th {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 6px 10px;
+    text-align: left;
+    background: rgba(255,255,255,0.02);
+    border-bottom: 1px solid var(--border);
+  }
+  .pcap-table td { padding: 5px 10px; border-bottom: 1px solid rgba(255,255,255,0.03); font-family: var(--mono); font-size: 11px; }
+  .pcap-table tr:hover td { background: var(--bg-hover); cursor: pointer; }
+  .pcap-modbus td:first-child { border-left: 2px solid var(--accent-cyan); }
+  .pcap-dnp3 td:first-child { border-left: 2px solid var(--accent-purple); }
+  .pcap-suspicious td:first-child { border-left: 2px solid var(--severity-critical); }
+  .pcap-normal td:first-child { border-left: 2px solid transparent; }
+
+  /* ── SIEM QUERY ── */
+  .siem-query {
+    font-family: var(--mono);
+    font-size: 12px;
+    background: #0a0f1a;
+    border: 1px solid var(--border-bright);
+    border-radius: 4px;
+    padding: 12px;
+    color: #e2e8f0;
+    width: 100%;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .siem-query:focus { border-color: var(--accent-green); }
+  .query-keyword { color: var(--accent-cyan); }
+  .query-string { color: var(--accent-amber); }
+
+  /* ── TOOLTIP NOTIF ── */
+  .notif-toast {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 300;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .toast {
+    background: var(--bg-card);
+    border: 1px solid var(--border-bright);
+    border-radius: 6px;
+    padding: 12px 16px;
+    font-size: 12px;
+    font-family: var(--mono);
+    animation: slideIn 0.3s ease;
+    max-width: 340px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .toast.critical { border-left: 3px solid var(--severity-critical); }
+  .toast.warn { border-left: 3px solid var(--severity-medium); }
+  .toast.ok { border-left: 3px solid var(--accent-green); }
+  .toast-icon { font-size: 16px; }
+  .toast-content .toast-title { font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
+  .toast-content .toast-msg { color: var(--text-secondary); font-size: 11px; }
+  @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+  /* Responsive adjustments */
+  @media (max-width: 1200px) {
+    .stat-row { grid-template-columns: repeat(3, 1fr); }
+    .mitre-grid { grid-template-columns: repeat(4, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<!-- TOP NAV -->
+<div class="topnav">
+  <div class="logo">⚡ ELITEWOLF-OT <span>// STUDENT EDITION v2.0</span></div>
+  <div class="nav-tabs">
+    <div class="nav-tab active" onclick="showSection('dashboard')">Dashboard</div>
+    <div class="nav-tab" onclick="showSection('alerts')">Alert Queue</div>
+    <div class="nav-tab" onclick="showSection('pcap')">Packet Analysis</div>
+    <div class="nav-tab" onclick="showSection('rules')">IDS Rules</div>
+    <div class="nav-tab" onclick="showSection('assets')">Asset Inventory</div>
+    <div class="nav-tab" onclick="showSection('mitre')">MITRE ATT&CK</div>
+    <div class="nav-tab" onclick="showSection('siem')">SIEM / Hunt</div>
+    <div class="nav-tab" onclick="showSection('incidents')">Incident Report</div>
+    <div class="nav-tab" onclick="showSection('lab')">Attack Sim</div>
+  </div>
+  <div class="status-bar">
+    <div class="status-dot"></div>
+    <div class="status-label">MONITORING ACTIVE</div>
+    <div class="clock" id="clockEl">—</div>
+  </div>
+</div>
+
+<!-- MAIN LAYOUT -->
+<div class="main">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">OT Zones</div>
+      <div class="sidebar-item active" onclick="filterZone('all')"><span class="icon">🌐</span> All Networks</div>
+      <div class="sidebar-item" onclick="filterZone('purdue0')"><span class="icon">⚙️</span> Level 0 – Field <div class="sidebar-badge" id="zBadge0">0</div></div>
+      <div class="sidebar-item" onclick="filterZone('purdue1')"><span class="icon">🎛️</span> Level 1 – PLC/RTU <div class="sidebar-badge amber" id="zBadge1">0</div></div>
+      <div class="sidebar-item" onclick="filterZone('purdue2')"><span class="icon">🖥️</span> Level 2 – SCADA <div class="sidebar-badge" id="zBadge2">0</div></div>
+      <div class="sidebar-item" onclick="filterZone('purdue3')"><span class="icon">🏭</span> Level 3 – MES</div>
+      <div class="sidebar-item" onclick="filterZone('dmz')"><span class="icon">🔒</span> DMZ</div>
+      <div class="sidebar-item" onclick="filterZone('purdue4')"><span class="icon">💼</span> Level 4 – Enterprise</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Protocols</div>
+      <div class="sidebar-item" onclick="filterProto('Modbus')"><span class="icon">📡</span> Modbus TCP</div>
+      <div class="sidebar-item" onclick="filterProto('DNP3')"><span class="icon">🔌</span> DNP3</div>
+      <div class="sidebar-item" onclick="filterProto('EtherNet/IP')"><span class="icon">🔗</span> EtherNet/IP</div>
+      <div class="sidebar-item" onclick="filterProto('IEC 61850')"><span class="icon">⚡</span> IEC 61850</div>
+      <div class="sidebar-item" onclick="filterProto('OPC-UA')"><span class="icon">🔄</span> OPC-UA</div>
+      <div class="sidebar-item" onclick="filterProto('S7Comm')"><span class="icon">🧩</span> S7comm</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Threat Intel</div>
+      <div class="sidebar-item" onclick="showSection('mitre')"><span class="icon">🗡️</span> MITRE ICS</div>
+      <div class="sidebar-item"><span class="icon">📋</span> CISA Advisories</div>
+      <div class="sidebar-item"><span class="icon">🔍</span> IOC Database</div>
+    </div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content" id="contentArea">
+
+    <!-- DASHBOARD SECTION -->
+    <div id="sec-dashboard" class="section active">
+
+      <!-- Stats Row -->
+      <div class="stat-row">
+        <div class="stat-card red">
+          <div class="stat-label">Critical Alerts</div>
+          <div class="stat-value" id="statCritical">0</div>
+          <div class="stat-sub">Requires immediate action</div>
+        </div>
+        <div class="stat-card orange">
+          <div class="stat-label">High Severity</div>
+          <div class="stat-value" id="statHigh">0</div>
+          <div class="stat-sub">Investigate within 1hr</div>
+        </div>
+        <div class="stat-card amber">
+          <div class="stat-label">Medium</div>
+          <div class="stat-value" id="statMedium">0</div>
+          <div class="stat-sub">Schedule review</div>
+        </div>
+        <div class="stat-card cyan">
+          <div class="stat-label">Packets/sec</div>
+          <div class="stat-value" id="statPPS">0</div>
+          <div class="stat-sub">Live traffic rate</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-label">Assets Online</div>
+          <div class="stat-value" id="statAssets">12</div>
+          <div class="stat-sub">Of 14 monitored</div>
+        </div>
+        <div class="stat-card purple">
+          <div class="stat-label">Rules Active</div>
+          <div class="stat-value" id="statRules">24</div>
+          <div class="stat-sub">IDS signatures loaded</div>
+        </div>
+      </div>
+
+      <!-- Network Topology + Live Log -->
+      <div class="grid-60-40">
+        <!-- Topology -->
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">⬡ OT NETWORK TOPOLOGY – PURDUE MODEL</span>
+            <div class="panel-actions">
+              <button class="btn-xs" onclick="resetTopology()">Reset</button>
+            </div>
+          </div>
+          <div class="topology-canvas">
+            <svg id="topoSvg" viewBox="0 0 560 310"></svg>
+          </div>
+        </div>
+
+        <!-- Live Event Log -->
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">📋 LIVE EVENT STREAM</span>
+            <div class="panel-actions">
+              <button class="btn-xs" id="pauseLogBtn" onclick="toggleLogPause()">Pause</button>
+              <button class="btn-xs" onclick="clearLog()">Clear</button>
+            </div>
+          </div>
+          <div class="log-area" id="liveLog"></div>
+        </div>
+      </div>
+
+      <!-- Recent Alerts + Traffic Chart -->
+      <div class="grid-60-40">
+        <!-- Recent Alerts -->
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">⚠ RECENT ALERTS</span>
+            <div class="panel-actions">
+              <button class="btn-xs" onclick="showSection('alerts')">View All →</button>
+            </div>
+          </div>
+          <table class="alert-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Severity</th>
+                <th>Rule</th>
+                <th>Src → Dst</th>
+                <th>Protocol</th>
+              </tr>
+            </thead>
+            <tbody id="recentAlertsTbody"></tbody>
+          </table>
+        </div>
+
+        <!-- Traffic over time -->
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">📊 TRAFFIC TIMELINE</span>
+          </div>
+          <div style="padding:14px;">
+            <canvas id="trafficChart" width="300" height="200"></canvas>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /dashboard -->
+
+    <!-- ALERTS SECTION -->
+    <div id="sec-alerts" class="section">
+      <div class="panel" style="grid-column:1/-1">
+        <div class="panel-header">
+          <span class="panel-title">⚠ ALERT QUEUE</span>
+          <div class="panel-actions">
+            <button class="btn-xs active" onclick="ackAll()">Ack All</button>
+            <button class="btn-xs" onclick="exportAlerts()">Export CSV</button>
+          </div>
+        </div>
+        <div class="search-row">
+          <input class="search-input" id="alertSearch" placeholder="Search alerts… (e.g. Modbus, 192.168, coil write)" oninput="renderAlertTable()">
+          <button class="filter-pill active" onclick="setFilter('all',this)">All</button>
+          <button class="filter-pill" onclick="setFilter('critical',this)">Critical</button>
+          <button class="filter-pill" onclick="setFilter('high',this)">High</button>
+          <button class="filter-pill" onclick="setFilter('medium',this)">Medium</button>
+          <button class="filter-pill" onclick="setFilter('low',this)">Low</button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="alert-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Timestamp</th>
+                <th>Severity</th>
+                <th>Rule Name</th>
+                <th>Category</th>
+                <th>Src IP</th>
+                <th>Dst IP</th>
+                <th>Protocol</th>
+                <th>Details</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="alertsTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div><!-- /alerts -->
+
+    <!-- PACKET ANALYSIS SECTION -->
+    <div id="sec-pcap" class="section">
+      <div class="panel" style="grid-column:1/-1">
+        <div class="panel-header">
+          <span class="panel-title">🔬 PACKET CAPTURE ANALYSIS (Simulated PCAP)</span>
+          <div class="panel-actions">
+            <button class="btn-xs active" id="captureBtn" onclick="toggleCapture()">⏹ Stop Capture</button>
+            <button class="btn-xs" onclick="clearPcap()">Clear</button>
+          </div>
+        </div>
+        <div style="overflow-x:auto; max-height:260px; overflow-y:auto;">
+          <table class="pcap-table">
+            <thead>
+              <tr>
+                <th>#</th><th>Time</th><th>Src IP</th><th>Dst IP</th>
+                <th>Protocol</th><th>Length</th><th>Function</th><th>Info</th>
+              </tr>
+            </thead>
+            <tbody id="pcapTbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="grid-2">
+        <!-- Protocol Decoder -->
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">🔍 PROTOCOL DECODER</span></div>
+          <div class="proto-fields" id="protoDecoder">
+            <div style="color:var(--text-muted);font-family:var(--mono);font-size:12px;padding:20px;text-align:center;">
+              Click a packet to decode
+            </div>
+          </div>
+        </div>
+        <!-- Hex Dump -->
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">📟 HEX DUMP</span></div>
+          <div style="padding:12px;">
+            <div class="packet-hex" id="hexDump">00 00 00 00 00 00 -- Click a packet to view raw bytes</div>
+          </div>
+        </div>
+      </div>
+    </div><!-- /pcap -->
+
+    <!-- IDS RULES SECTION -->
+    <div id="sec-rules" class="section">
+      <div class="grid-60-40">
+        <!-- Rule Editor -->
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">✏️ IDS RULE EDITOR</span>
+            <div class="panel-actions">
+              <button class="btn-xs" onclick="loadTemplateRule()">Load Template</button>
+              <button class="btn-primary" onclick="saveRule()">+ Add Rule</button>
+            </div>
+          </div>
+          <div style="padding:14px;">
+            <div style="margin-bottom:8px;font-family:var(--mono);font-size:11px;color:var(--text-secondary);">
+              Snort-compatible IDS rule syntax for OT/ICS protocols
+            </div>
+            <textarea class="rule-editor" id="ruleEditor" spellcheck="false">alert tcp any any -> 192.168.1.0/24 502 (msg:"Modbus Write Multiple Coils - Possible Unauthorized Command"; flow:to_server,established; content:"|00 00 00 00|"; depth:4; content:"|0F|"; offset:7; depth:1; classtype:protocol-command-decode; priority:2; sid:9000001; rev:1;)</textarea>
+            <div style="margin-top:10px;font-family:var(--mono);font-size:11px;color:var(--text-muted);" id="ruleValidation"></div>
+          </div>
+        </div>
+        <!-- Rule List -->
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">📜 ACTIVE RULES</span></div>
+          <div style="max-height:500px;overflow-y:auto;" id="ruleList"></div>
+        </div>
+      </div>
+    </div><!-- /rules -->
+
+    <!-- ASSETS SECTION -->
+    <div id="sec-assets" class="section">
+      <div class="panel" style="grid-column:1/-1">
+        <div class="panel-header">
+          <span class="panel-title">🏭 ASSET INVENTORY – OT DEVICES</span>
+          <div class="panel-actions">
+            <button class="btn-xs">Export</button>
+            <button class="btn-primary">+ Add Asset</button>
+          </div>
+        </div>
+        <div class="asset-grid" id="assetGrid"></div>
+      </div>
+    </div><!-- /assets -->
+
+    <!-- MITRE SECTION -->
+    <div id="sec-mitre" class="section">
+      <div class="panel" style="grid-column:1/-1">
+        <div class="panel-header">
+          <span class="panel-title">🗡️ MITRE ATT&CK FOR ICS – COVERAGE MATRIX</span>
+          <div class="panel-actions">
+            <span style="font-family:var(--mono);font-size:11px;color:var(--severity-critical);">■ Detected</span>
+            <span style="font-family:var(--mono);font-size:11px;color:var(--severity-medium);margin-left:10px;">■ Partial</span>
+            <span style="font-family:var(--mono);font-size:11px;color:var(--text-secondary);margin-left:10px;">■ Uncovered</span>
+          </div>
+        </div>
+        <div class="mitre-grid" id="mitreGrid"></div>
+      </div>
+    </div><!-- /mitre -->
+
+    <!-- SIEM SECTION -->
+    <div id="sec-siem" class="section">
+      <div class="panel" style="grid-column:1/-1">
+        <div class="panel-header">
+          <span class="panel-title">🔍 SIEM THREAT HUNTER – SPL/KQL QUERY CONSOLE</span>
+        </div>
+        <div style="padding:14px;">
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-secondary);margin-bottom:8px;">Query language: SPL (Splunk-style)</div>
+          <textarea class="siem-query" id="siemQuery" rows="3">index=ot_traffic sourcetype=modbus | where function_code IN (5,6,15,16) | stats count by src_ip, dst_ip, function_code | where count > 10 | sort -count</textarea>
+          <div style="display:flex;gap:8px;margin-top:10px;">
+            <button class="btn-primary" onclick="runSIEMQuery()">▶ Run Query</button>
+            <button class="btn-xs" onclick="loadQueryTemplate('coilWrite')">Coil Writes</button>
+            <button class="btn-xs" onclick="loadQueryTemplate('bruteForce')">Auth Brute</button>
+            <button class="btn-xs" onclick="loadQueryTemplate('scanDetect')">Port Scan</button>
+            <button class="btn-xs" onclick="loadQueryTemplate('baseline')">Baseline Deviation</button>
+          </div>
+        </div>
+        <div id="siemResults" style="padding:14px;border-top:1px solid var(--border);"></div>
+      </div>
+
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">📈 ALERT TREND (7 DAYS)</span></div>
+          <div style="padding:14px;"><canvas id="trendChart" width="400" height="180"></canvas></div>
+        </div>
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">🥧 ALERT BREAKDOWN BY PROTOCOL</span></div>
+          <div style="padding:14px;"><canvas id="protoChart" width="400" height="180"></canvas></div>
+        </div>
+      </div>
+    </div><!-- /siem -->
+
+    <!-- INCIDENT SECTION -->
+    <div id="sec-incidents" class="section">
+      <div class="grid-60-40">
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">📝 INCIDENT REPORT GENERATOR</span>
+            <div class="panel-actions">
+              <button class="btn-primary" onclick="generateReport()">Generate Report</button>
+            </div>
+          </div>
+          <div class="report-area">
+            <div class="report-field">
+              <label>Incident ID</label>
+              <input type="text" id="incidentId" value="INC-2024-0047" />
+            </div>
+            <div class="report-field">
+              <label>Incident Title</label>
+              <input type="text" id="incidentTitle" value="Unauthorized Modbus Write Coil Commands to PLC-01" />
+            </div>
+            <div class="grid-2">
+              <div class="report-field">
+                <label>Severity</label>
+                <select id="incidentSeverity">
+                  <option>CRITICAL</option><option>HIGH</option><option selected>MEDIUM</option><option>LOW</option>
+                </select>
+              </div>
+              <div class="report-field">
+                <label>Status</label>
+                <select id="incidentStatus">
+                  <option>Open</option><option>Investigating</option><option>Contained</option><option>Resolved</option>
+                </select>
+              </div>
+            </div>
+            <div class="report-field">
+              <label>Affected Assets</label>
+              <input type="text" id="incidentAssets" value="PLC-01 (192.168.10.5), HMI-02 (192.168.20.12)" />
+            </div>
+            <div class="report-field">
+              <label>Attack Vector / MITRE Technique</label>
+              <input type="text" id="incidentMitre" value="T0836 – Modify Parameter / T0855 – Unauthorized Command Message" />
+            </div>
+            <div class="report-field">
+              <label>Description of Events</label>
+              <textarea id="incidentDesc">At 14:32 UTC, IDS Rule SID:9000001 triggered on repeated Modbus Function Code 0x05 (Write Single Coil) and 0x0F (Write Multiple Coils) commands from an unregistered source IP 192.168.50.99 targeting PLC-01. The source is not an authorized engineering workstation. Commands were issued to coil addresses 0x0001–0x00FF at a rate exceeding 200 commands/minute, suggesting automated tooling.</textarea>
+            </div>
+            <div class="report-field">
+              <label>Immediate Response Actions</label>
+              <textarea id="incidentResponse">1. Network isolation of 192.168.50.99 via ACL push to DMZ firewall
+2. Capture of full session PCAP for forensics
+3. Verified PLC-01 physical state — no actuators triggered
+4. Notified ICS operations lead (P. Chen)
+5. Preserved logs in evidence vault</textarea>
+            </div>
+            <div class="report-field">
+              <label>Analyst Name</label>
+              <input type="text" id="analystName" value="" placeholder="Your name (for portfolio)" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Generated Report Preview -->
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">📄 REPORT PREVIEW</span></div>
+          <div id="reportPreview" style="padding:16px;font-family:var(--mono);font-size:11px;color:var(--text-secondary);line-height:2;">
+            Fill in fields and click "Generate Report" →
+          </div>
+        </div>
+      </div>
+    </div><!-- /incidents -->
+
+    <!-- ATTACK SIM SECTION -->
+    <div id="sec-lab" class="section">
+      <div class="grid-2">
+        <!-- Sim Controls -->
+        <div class="sim-controls">
+          <div class="sim-title">⚡ ATTACK SCENARIO SIMULATOR <span style="font-size:11px;color:var(--text-secondary)">(Educational / Safe)</span></div>
+          <div style="font-size:12px;color:var(--text-secondary);margin-bottom:14px;">
+            Inject synthetic OT attack traffic to practice detection and investigation. All packets are simulated — no real network traffic.
+          </div>
+          <div class="scenario-grid" id="scenarioGrid"></div>
+          <div style="margin-top:14px;" id="simStatus"></div>
+        </div>
+
+        <!-- Learning Objectives -->
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">🎓 LEARNING OBJECTIVES</span></div>
+          <div style="padding:14px;font-size:12px;line-height:2;color:var(--text-secondary);">
+            <div style="color:var(--accent-green);font-family:var(--mono);margin-bottom:10px;">// What this lab teaches you:</div>
+            <div>✅ <strong style="color:var(--text-primary)">OT Protocol Analysis</strong> — Decode Modbus, DNP3, EtherNet/IP frames</div>
+            <div>✅ <strong style="color:var(--text-primary)">IDS Rule Writing</strong> — Create Snort-style signatures for ICS attacks</div>
+            <div>✅ <strong style="color:var(--text-primary)">Threat Detection</strong> — Identify ELITEWOLF-pattern anomalies in OT traffic</div>
+            <div>✅ <strong style="color:var(--text-primary)">SIEM Queries</strong> — Write SPL hunts for ICS threat campaigns</div>
+            <div>✅ <strong style="color:var(--text-primary)">MITRE ICS Mapping</strong> — Tag techniques to real-world attack frameworks</div>
+            <div>✅ <strong style="color:var(--text-primary)">Incident Response</strong> — Generate professional IR reports</div>
+            <div>✅ <strong style="color:var(--text-primary)">Asset Visibility</strong> — Maintain OT device inventory</div>
+            <br>
+            <div style="color:var(--accent-amber);font-family:var(--mono);margin-bottom:8px;">// Real-world frameworks referenced:</div>
+            <div>📌 CISA ELITEWOLF Sigma/Snort rules (GitHub)</div>
+            <div>📌 NIST SP 800-82 (ICS Security Guide)</div>
+            <div>📌 IEC 62443 (Industrial Security Standards)</div>
+            <div>📌 MITRE ATT&CK for ICS (ics.mitre.org)</div>
+            <div>📌 Dragos Year in Review / Claroty Research</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Attack Progress -->
+      <div class="panel" id="attackProgressPanel" style="display:none;">
+        <div class="panel-header"><span class="panel-title">⚡ ATTACK IN PROGRESS</span></div>
+        <div style="padding:14px;" id="attackProgressContent"></div>
+      </div>
+    </div><!-- /lab -->
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<!-- Alert Detail Modal -->
+<div class="modal-overlay" id="alertModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modalTitle">Alert Detail</h2>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<!-- Toast Notifications -->
+<div class="notif-toast" id="toastContainer"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// DATA: Alerts, Assets, Rules, Scenarios
+// ═══════════════════════════════════════════════════════
+
+let alerts = [];
+let alertFilter = 'all';
+let logPaused = false;
+let captureActive = true;
+let pcapPackets = [];
+let pcapCounter = 0;
+let trafficHistory = new Array(60).fill(0);
+let trafficPPS = 0;
+let rulesList = [];
+
+const OT_IPS = {
+  'PLC-01':      '192.168.10.5',
+  'PLC-02':      '192.168.10.6',
+  'RTU-01':      '192.168.10.20',
+  'HMI-01':      '192.168.20.10',
+  'HMI-02':      '192.168.20.12',
+  'SCADA-SRV':   '192.168.20.50',
+  'ENG-WS-01':   '192.168.30.5',
+  'ENG-WS-02':   '192.168.30.6',
+  'HIST-SRV':    '192.168.30.20',
+  'JUMP-SRV':    '192.168.40.10',
+  'FW-DMZ':      '192.168.40.1',
+  'ATTACKER':    '192.168.50.99',
+};
+
+const RULES = [
+  { sid: '9000001', name: 'Modbus Write Single Coil', proto: 'Modbus', severity: 'high', enabled: true, hits: 0, desc: 'Detects FC 0x05 write coil commands to PLC network' },
+  { sid: '9000002', name: 'Modbus Write Multiple Coils', proto: 'Modbus', severity: 'critical', enabled: true, hits: 0, desc: 'Detects FC 0x0F bulk coil write — common in INCONTROLLER/PIPEDREAM' },
+  { sid: '9000003', name: 'Modbus Force Listen Only Mode', proto: 'Modbus', severity: 'critical', enabled: true, hits: 0, desc: 'Detects FC 0x08 diagnostic — can lock out legitimate operators' },
+  { sid: '9000004', name: 'DNP3 Unauthorized Operate', proto: 'DNP3', severity: 'high', enabled: true, hits: 0, desc: 'DNP3 direct operate command from non-engineering source' },
+  { sid: '9000005', name: 'EtherNet/IP Set Attribute', proto: 'EtherNet/IP', severity: 'medium', enabled: true, hits: 0, desc: 'CIP Set Attribute Single to known PLC — possible config change' },
+  { sid: '9000006', name: 'Modbus Rapid Polling', proto: 'Modbus', severity: 'medium', enabled: true, hits: 0, desc: 'More than 100 Modbus requests/min from single source (recon)' },
+  { sid: '9000007', name: 'S7comm Stop CPU', proto: 'S7Comm', severity: 'critical', enabled: true, hits: 0, desc: 'Siemens S7 stop command — can halt production (STUXNET-style)' },
+  { sid: '9000008', name: 'DNP3 Warm Restart', proto: 'DNP3', severity: 'high', enabled: true, hits: 0, desc: 'DNP3 function code 13 warm restart from unauthorized source' },
+  { sid: '9000009', name: 'OPC-UA Anomalous Browse', proto: 'OPC-UA', severity: 'low', enabled: true, hits: 0, desc: 'Excessive OPC-UA Browse requests — possible asset discovery tool' },
+  { sid: '9000010', name: 'New Device on OT Network', proto: 'Any', severity: 'medium', enabled: true, hits: 0, desc: 'Previously unseen MAC/IP detected on Level 1/2 segments' },
+  { sid: '9000011', name: 'Engineering Software to PLC (Off-Hours)', proto: 'Modbus', severity: 'high', enabled: true, hits: 0, desc: 'Engineering software connection outside scheduled maintenance window' },
+  { sid: '9000012', name: 'IT-to-OT Lateral Movement', proto: 'Any', severity: 'critical', enabled: true, hits: 0, desc: 'Enterprise IP initiating sessions to OT Level 1/2 without proxy' },
+];
+
+const ASSETS = [
+  { name: 'PLC-01', type: 'Programmable Logic Controller', vendor: 'Allen-Bradley', model: '1756-L75', ip: '192.168.10.5', zone: 'purdue1', icon: '⚙️', status: 'alert', firmware: 'v20.052' },
+  { name: 'PLC-02', type: 'Programmable Logic Controller', vendor: 'Siemens', model: 'S7-315', ip: '192.168.10.6', zone: 'purdue1', icon: '⚙️', status: 'ok', firmware: 'v3.2.4' },
+  { name: 'RTU-01', type: 'Remote Terminal Unit', vendor: 'GE', model: 'D20MX', ip: '192.168.10.20', zone: 'purdue1', icon: '📡', status: 'ok', firmware: 'v7.1.0' },
+  { name: 'HMI-01', type: 'Human Machine Interface', vendor: 'Wonderware', model: 'InTouch 2020', ip: '192.168.20.10', zone: 'purdue2', icon: '🖥️', status: 'ok', firmware: 'v20.0' },
+  { name: 'HMI-02', type: 'Human Machine Interface', vendor: 'Ignition', model: 'v8.1', ip: '192.168.20.12', zone: 'purdue2', icon: '🖥️', status: 'warn', firmware: 'v8.1.0' },
+  { name: 'SCADA-SRV', type: 'SCADA Server', vendor: 'OSIsoft', model: 'PI Server', ip: '192.168.20.50', zone: 'purdue2', icon: '🏭', status: 'ok', firmware: 'v3.4.1' },
+  { name: 'ENG-WS-01', type: 'Engineering Workstation', vendor: 'Dell', model: 'Precision 5820', ip: '192.168.30.5', zone: 'purdue3', icon: '💻', status: 'ok', firmware: 'Win10 LTSC' },
+  { name: 'HIST-SRV', type: 'Historian Server', vendor: 'Emerson', model: 'DeltaV Historian', ip: '192.168.30.20', zone: 'purdue3', icon: '📊', status: 'ok', firmware: 'v14.3' },
+  { name: 'JUMP-SRV', type: 'Jump Server / Bastion Host', vendor: 'Internal', model: 'Linux RHEL 8', ip: '192.168.40.10', zone: 'dmz', icon: '🔒', status: 'ok', firmware: 'RHEL 8.6' },
+  { name: 'FW-DMZ', type: 'Industrial Firewall', vendor: 'Fortinet', model: 'FortiGate 60F', ip: '192.168.40.1', zone: 'dmz', icon: '🛡️', status: 'ok', firmware: 'v7.0.5' },
+];
+
+const MITRE_MATRIX = {
+  'Initial Access': ['T0817 Drive-by Compromise', 'T0819 Exploit Public App', 'T0866 Exploitation of Remote Services', 'T0886 Remote Services'],
+  'Execution':      ['T0858 Change Op Mode', 'T0807 Command-Line Interface', 'T0871 Execution through API', 'T0823 Graphical User Interface'],
+  'Persistence':    ['T0839 Module Firmware', 'T0873 Project File Infection', 'T0857 System Firmware', 'T0859 Valid Accounts'],
+  'Evasion':        ['T0820 Exploitation for Evasion', 'T0872 Indicator Removal', 'T0849 Masquerading', 'T0851 Rootkit'],
+  'Discovery':      ['T0840 Network Sniffing', 'T0846 Remote System Discovery', 'T0888 Remote System Info', 'T0887 Remote Services Discovery'],
+  'Lateral Move':   ['T0812 Default Creds', 'T0866 Exploit Remote Services', 'T0843 Program Download', 'T0886 Remote Services'],
+  'Collection':     ['T0811 Data from Info Repos', 'T0868 Detect Operating Mode', 'T0877 I/O Image', 'T0801 Monitor Process State'],
+  'Impact':         ['T0813 Denial of Control', 'T0815 Denial of View', 'T0816 Device Restart/Shutdown', 'T0836 Modify Parameter', 'T0855 Unauthorized Command'],
+};
+
+// Techniques that are "detected" or "partial" by our rules
+const MITRE_HIT = ['T0836 Modify Parameter', 'T0855 Unauthorized Command', 'T0840 Network Sniffing', 'T0816 Device Restart/Shutdown', 'T0813 Denial of Control'];
+const MITRE_PARTIAL = ['T0846 Remote System Discovery', 'T0888 Remote System Info', 'T0858 Change Op Mode', 'T0873 Project File Infection'];
+
+const ATTACK_SCENARIOS = [
+  {
+    id: 'modbus_recon',
+    name: '🔍 Modbus Reconnaissance',
+    desc: 'Attacker scans PLC coil/register map using function codes 01, 03, 04',
+    tags: ['modbus', 'ics'],
+    severity: 'medium',
+    steps: [
+      { delay: 200, msg: 'Source 192.168.50.99 sending Modbus FC 01 (Read Coils) to PLC-01', type: 'warn' },
+      { delay: 400, msg: 'Read Coil Status — 512 coils polled in 1.2 seconds', type: 'warn' },
+      { delay: 700, msg: 'FC 03 (Read Holding Registers) sweep — addresses 0x0000–0x00FF', type: 'warn' },
+      { delay: 1000, msg: 'IDS ALERT: Modbus Rapid Polling — 147 requests/min from 192.168.50.99', type: 'alert' },
+      { delay: 1300, msg: 'MITRE T0888: Remote System Info Discovery technique detected', type: 'alert' },
+    ],
+    alertTemplate: { rule: 'Modbus Rapid Polling', category: 'Reconnaissance', src: '192.168.50.99', dst: '192.168.10.5', proto: 'Modbus', severity: 'medium' }
+  },
+  {
+    id: 'unauthorized_write',
+    name: '⚡ Unauthorized Coil Write',
+    desc: 'INCONTROLLER-style bulk write to disable safety interlocks',
+    tags: ['modbus', 'ics'],
+    severity: 'critical',
+    steps: [
+      { delay: 200, msg: 'ALERT: FC 0x05 Write Single Coil from unregistered source 192.168.50.99', type: 'alert' },
+      { delay: 500, msg: 'FC 0x0F Write Multiple Coils — 64 coils at addresses 0x0001–0x0040', type: 'alert' },
+      { delay: 800, msg: 'Coil write rate: 220 commands/min — automated tooling suspected', type: 'alert' },
+      { delay: 1100, msg: 'CRITICAL: PLC-01 output coils modified — check actuator states NOW', type: 'alert' },
+      { delay: 1400, msg: 'MITRE T0836 (Modify Parameter) + T0855 (Unauthorized Command) mapped', type: 'alert' },
+    ],
+    alertTemplate: { rule: 'Modbus Write Multiple Coils', category: 'Unauthorized Command', src: '192.168.50.99', dst: '192.168.10.5', proto: 'Modbus', severity: 'critical' }
+  },
+  {
+    id: 'dnp3_restart',
+    name: '🔄 DNP3 Warm Restart',
+    desc: 'Force RTU restart causing temporary loss of monitoring visibility',
+    tags: ['dnp3', 'ics'],
+    severity: 'high',
+    steps: [
+      { delay: 200, msg: 'DNP3 Session from 192.168.50.99 to RTU-01 (192.168.10.20)', type: 'warn' },
+      { delay: 500, msg: 'DNP3 Application Control Block — function 0x0D (Warm Restart)', type: 'alert' },
+      { delay: 800, msg: 'ALERT: Unauthorized DNP3 Warm Restart command detected!', type: 'alert' },
+      { delay: 1100, msg: 'RTU-01 offline — 45-second monitoring gap begins', type: 'alert' },
+      { delay: 1400, msg: 'MITRE T0813: Denial of Control + T0815: Denial of View', type: 'alert' },
+    ],
+    alertTemplate: { rule: 'DNP3 Warm Restart', category: 'Denial of Control', src: '192.168.50.99', dst: '192.168.10.20', proto: 'DNP3', severity: 'high' }
+  },
+  {
+    id: 's7_stop',
+    name: '💀 S7 CPU Stop (STUXNET-style)',
+    desc: 'Siemens S7comm stop CPU command — halts PLC execution',
+    tags: ['ics'],
+    severity: 'critical',
+    steps: [
+      { delay: 200, msg: 'S7comm connection established to PLC-02 (192.168.10.6) — port 102', type: 'warn' },
+      { delay: 500, msg: 'S7comm PDU: Job request — function 0x29 (CPU Stop)', type: 'alert' },
+      { delay: 800, msg: 'CRITICAL ALERT: S7 Stop CPU command — PLC-02 entering STOP mode!', type: 'alert' },
+      { delay: 1100, msg: 'PLC-02 output state frozen — physical process may be uncontrolled', type: 'alert' },
+      { delay: 1400, msg: 'MITRE T0816: Device Restart/Shutdown confirmed', type: 'alert' },
+    ],
+    alertTemplate: { rule: 'S7comm Stop CPU', category: 'Manipulation of Control', src: '192.168.50.99', dst: '192.168.10.6', proto: 'S7Comm', severity: 'critical' }
+  },
+  {
+    id: 'it_ot_pivot',
+    name: '↔️ IT→OT Lateral Movement',
+    desc: 'Enterprise IP pivoting through DMZ into OT Level 2',
+    tags: ['ics'],
+    severity: 'critical',
+    steps: [
+      { delay: 200, msg: 'New connection: 10.0.0.55 (Enterprise) → 192.168.40.10 (Jump Server)', type: 'warn' },
+      { delay: 500, msg: 'Jump server used to initiate RDP to HMI-02 (192.168.20.12)', type: 'alert' },
+      { delay: 800, msg: 'ALERT: IT-to-OT Lateral Movement — rule IT_OT_PIVOT triggered', type: 'alert' },
+      { delay: 1100, msg: 'HMI-02 session: Ignition Designer opened — project editing possible', type: 'alert' },
+      { delay: 1400, msg: 'MITRE T0866 Exploit Remote Services + T0859 Valid Accounts', type: 'alert' },
+    ],
+    alertTemplate: { rule: 'IT-to-OT Lateral Movement', category: 'Lateral Movement', src: '10.0.0.55', dst: '192.168.20.12', proto: 'RDP', severity: 'critical' }
+  },
+  {
+    id: 'enip_setattr',
+    name: '🔗 EtherNet/IP Config Tamper',
+    desc: 'CIP Set Attribute modifies PLC configuration remotely',
+    tags: ['enip', 'ics'],
+    severity: 'high',
+    steps: [
+      { delay: 200, msg: 'EtherNet/IP connection from 192.168.50.99 to PLC-01 port 44818', type: 'warn' },
+      { delay: 500, msg: 'CIP Service 0x10 (Set Attribute Single) — Class 0x04, Attribute 0x07', type: 'warn' },
+      { delay: 800, msg: 'ALERT: PLC configuration attribute modified via CIP SetAttr', type: 'alert' },
+      { delay: 1100, msg: 'Attribute: Output Fault Action changed to Hold Last State', type: 'alert' },
+      { delay: 1400, msg: 'MITRE T0836 Modify Parameter — CIP profile match', type: 'alert' },
+    ],
+    alertTemplate: { rule: 'EtherNet/IP Set Attribute', category: 'Manipulation of Control', src: '192.168.50.99', dst: '192.168.10.5', proto: 'EtherNet/IP', severity: 'high' }
+  },
+];
+
+// ═══════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════
+
+function init() {
+  updateClock();
+  setInterval(updateClock, 1000);
+  renderRuleList();
+  renderAssets();
+  renderMitre();
+  renderScenarios();
+  drawTopology();
+  startTrafficSimulation();
+  initTrafficChart();
+  initTrendChart();
+  initProtoChart();
+
+  // Seed a few initial alerts
+  setTimeout(() => injectAlert({ rule: 'Modbus Rapid Polling', category: 'Reconnaissance', src: '192.168.50.99', dst: '192.168.10.5', proto: 'Modbus', severity: 'medium' }), 800);
+  setTimeout(() => injectAlert({ rule: 'New Device on OT Network', category: 'Asset Discovery', src: '192.168.50.99', dst: 'Broadcast', proto: 'ARP', severity: 'medium' }), 1600);
+  setTimeout(() => injectAlert({ rule: 'Modbus Write Single Coil', category: 'Unauthorized Command', src: '192.168.50.99', dst: '192.168.10.5', proto: 'Modbus', severity: 'high' }), 2600);
+}
+
+// ═══════════════════════════════════════════════════════
+// CLOCK
+// ═══════════════════════════════════════════════════════
+
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clockEl').textContent = now.toISOString().replace('T',' ').slice(0,19) + ' UTC';
+}
+
+// ═══════════════════════════════════════════════════════
+// SECTION NAVIGATION
+// ═══════════════════════════════════════════════════════
+
+function showSection(name) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('sec-' + name).classList.add('active');
+  const tabs = document.querySelectorAll('.nav-tab');
+  tabs.forEach(t => { if (t.textContent.toLowerCase().includes(name.slice(0,4).toLowerCase())) t.classList.add('active'); });
+  if (name === 'alerts') renderAlertTable();
+}
+
+// ═══════════════════════════════════════════════════════
+// ALERT SYSTEM
+// ═══════════════════════════════════════════════════════
+
+function injectAlert(tmpl, extra = {}) {
+  const ts = new Date().toISOString().replace('T',' ').slice(0,19);
+  const id = alerts.length + 1;
+  const alert = { id, ts, ...tmpl, ...extra, status: 'Open', isNew: true };
+  alerts.unshift(alert);
+  updateStats();
+  updateRecentAlerts();
+  renderAlertTable();
+  bumpRuleHit(tmpl.rule);
+  showToast(tmpl.severity, tmpl.rule, `${tmpl.src} → ${tmpl.dst}`);
+  logEvent(tmpl.severity === 'critical' || tmpl.severity === 'high' ? 'alert' : 'warn',
+    `[IDS] ${tmpl.rule} :: ${tmpl.src} → ${tmpl.dst} [${tmpl.proto}]`);
+
+  // Update zone badges
+  updateZoneBadges();
+  return alert;
+}
+
+function updateStats() {
+  const counts = { critical:0, high:0, medium:0, low:0 };
+  alerts.forEach(a => { if(a.status === 'Open') counts[a.severity] = (counts[a.severity]||0) + 1; });
+  document.getElementById('statCritical').textContent = counts.critical || 0;
+  document.getElementById('statHigh').textContent = counts.high || 0;
+  document.getElementById('statMedium').textContent = counts.medium || 0;
+}
+
+function updateRecentAlerts() {
+  const tbody = document.getElementById('recentAlertsTbody');
+  const recent = alerts.slice(0,8);
+  tbody.innerHTML = recent.map(a => `
+    <tr onclick="openAlertModal(${a.id})">
+      <td style="color:var(--text-muted);font-family:var(--mono);font-size:10px;">${a.ts.slice(11)}</td>
+      <td><span class="sev-badge sev-${a.severity}">${a.severity}</span></td>
+      <td style="font-family:var(--mono);font-size:11px;">${a.rule}</td>
+      <td style="font-family:var(--mono);font-size:11px;color:var(--accent-cyan);">${a.src} → ${a.dst}</td>
+      <td><span class="proto-tag">${a.proto}</span></td>
+    </tr>
+  `).join('');
+}
+
+let currentAlertFilter = 'all';
+
+function setFilter(f, el) {
+  currentAlertFilter = f;
+  document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  renderAlertTable();
+}
+
+function renderAlertTable() {
+  const tbody = document.getElementById('alertsTbody');
+  if (!tbody) return;
+  const search = (document.getElementById('alertSearch')?.value || '').toLowerCase();
+  let filtered = alerts.filter(a => {
+    if (currentAlertFilter !== 'all' && a.severity !== currentAlertFilter) return false;
+    if (search && !JSON.stringify(a).toLowerCase().includes(search)) return false;
+    return true;
+  });
+  tbody.innerHTML = filtered.map(a => `
+    <tr class="${a.isNew ? 'alert-row-new' : ''}" onclick="openAlertModal(${a.id})">
+      <td style="font-family:var(--mono);font-size:10px;color:var(--text-muted);">${a.id}</td>
+      <td style="font-family:var(--mono);font-size:10px;color:var(--text-muted);">${a.ts}</td>
+      <td><span class="sev-badge sev-${a.severity}">${a.severity}</span></td>
+      <td style="font-family:var(--mono);font-size:11px;">${a.rule}</td>
+      <td style="font-size:11px;color:var(--text-secondary);">${a.category||'-'}</td>
+      <td style="font-family:var(--mono);font-size:11px;color:var(--accent-cyan);">${a.src}</td>
+      <td style="font-family:var(--mono);font-size:11px;color:var(--accent-cyan);">${a.dst}</td>
+      <td><span class="proto-tag">${a.proto}</span></td>
+      <td style="font-size:11px;color:var(--text-secondary);">${a.category||'-'}</td>
+      <td><span style="font-size:10px;font-family:var(--mono);color:${a.status==='Open'?'var(--severity-critical)':'var(--accent-green)'}">${a.status}</span></td>
+    </tr>
+  `).join('') || `<tr><td colspan="10" style="text-align:center;padding:30px;color:var(--text-muted);font-family:var(--mono);">No alerts matching filter</td></tr>`;
+}
+
+function ackAll() {
+  alerts.forEach(a => { a.status = 'Acknowledged'; a.isNew = false; });
+  renderAlertTable();
+  updateStats();
+  showToast('ok', 'All Alerts Acknowledged', 'Analyst reviewed all open alerts');
+}
+
+function exportAlerts() {
+  const csv = ['ID,Timestamp,Severity,Rule,Src,Dst,Protocol,Status',
+    ...alerts.map(a => `${a.id},${a.ts},${a.severity},"${a.rule}",${a.src},${a.dst},${a.proto},${a.status}`)
+  ].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = 'ot_alerts.csv'; a.click();
+}
+
+function updateZoneBadges() {
+  const l1 = alerts.filter(a => ['192.168.10.'].some(p => a.dst.startsWith(p)) && a.status==='Open').length;
+  const l2 = alerts.filter(a => ['192.168.20.'].some(p => a.dst.startsWith(p)) && a.status==='Open').length;
+  document.getElementById('zBadge1').textContent = l1;
+  document.getElementById('zBadge2').textContent = l2;
+  document.getElementById('zBadge0').textContent = alerts.filter(a => a.status==='Open').length;
+}
+
+// ═══════════════════════════════════════════════════════
+// ALERT MODAL
+// ═══════════════════════════════════════════════════════
+
+function openAlertModal(id) {
+  const a = alerts.find(x => x.id === id);
+  if (!a) return;
+  a.isNew = false;
+  document.getElementById('modalTitle').textContent = `⚠ Alert #${a.id}: ${a.rule}`;
+
+  const hexSample = generateHex(a.proto);
+  const iocs = generateIOCs(a);
+
+  document.getElementById('modalBody').innerHTML = `
+    <div class="detail-row"><div class="detail-key">Alert ID</div><div class="detail-val">#${a.id}</div></div>
+    <div class="detail-row"><div class="detail-key">Timestamp</div><div class="detail-val">${a.ts} UTC</div></div>
+    <div class="detail-row"><div class="detail-key">Severity</div><div class="detail-val red">${a.severity.toUpperCase()}</div></div>
+    <div class="detail-row"><div class="detail-key">Rule Name</div><div class="detail-val">${a.rule}</div></div>
+    <div class="detail-row"><div class="detail-key">Category</div><div class="detail-val">${a.category}</div></div>
+    <div class="detail-row"><div class="detail-key">Source IP</div><div class="detail-val cyan">${a.src}</div></div>
+    <div class="detail-row"><div class="detail-key">Destination IP</div><div class="detail-val cyan">${a.dst}</div></div>
+    <div class="detail-row"><div class="detail-key">Protocol</div><div class="detail-val">${a.proto}</div></div>
+    <div class="detail-row"><div class="detail-key">Status</div><div class="detail-val">${a.status}</div></div>
+
+    <div style="margin-top:16px;font-family:var(--mono);font-size:11px;color:var(--text-secondary);">IOC SUMMARY</div>
+    <div class="ioc-list">${iocs}</div>
+
+    <div style="margin-top:14px;font-family:var(--mono);font-size:11px;color:var(--text-secondary);">RAW PACKET (first 128 bytes)</div>
+    <div class="packet-hex">${hexSample}</div>
+
+    <div style="display:flex;gap:10px;margin-top:16px;">
+      <button class="btn-primary" onclick="escalateAlert(${a.id})">Escalate</button>
+      <button class="btn-xs" onclick="closeModal()">Close</button>
+      <button class="btn-danger" onclick="dismissAlert(${a.id})">False Positive</button>
+    </div>
+  `;
+  document.getElementById('alertModal').classList.add('open');
+}
+
+function generateIOCs(a) {
+  return `
+    <div class="ioc-item"><div class="ioc-type">src_ip</div><div class="ioc-val">${a.src}</div><div class="ioc-badge"><span class="sev-badge sev-high">SUSPICIOUS</span></div></div>
+    <div class="ioc-item"><div class="ioc-type">dst_ip</div><div class="ioc-val">${a.dst}</div></div>
+    <div class="ioc-item"><div class="ioc-type">protocol</div><div class="ioc-val">${a.proto}</div></div>
+    <div class="ioc-item"><div class="ioc-type">sid</div><div class="ioc-val">${getRuleSID(a.rule)}</div></div>
+  `;
+}
+
+function getRuleSID(ruleName) {
+  const r = rulesList.find(x => x.name === ruleName) || RULES.find(x => x.name.includes(ruleName.slice(0,10)));
+  return r ? r.sid : '9000000';
+}
+
+function generateHex(proto) {
+  const hexBytes = {
+    'Modbus': '00 01 00 00 00 06 01 0F 00 01 00 40 08 FF FF FF FF FF FF FF FF',
+    'DNP3':   '05 64 1A C4 01 00 03 00 A5 C6 C0 C1 0D 00 00 00 00 00 00 00',
+    'EtherNet/IP': '65 00 04 00 05 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00',
+    'S7Comm': '03 00 00 21 02 F0 80 32 01 00 00 00 00 00 0E 00 00 04 01 12 0A 10 02 00 01',
+    'default': '45 00 00 3C A6 D2 40 00 40 06 00 00 C0 A8 32 63 C0 A8 0A 05',
+  };
+  const base = hexBytes[proto] || hexBytes['default'];
+  // pad to 3 rows
+  let h = base;
+  while (h.split(' ').length < 48) h += ' ' + Math.floor(Math.random()*256).toString(16).padStart(2,'0').toUpperCase();
+  const bytes = h.split(' ');
+  let out = '';
+  for (let i = 0; i < bytes.length; i += 16) {
+    const row = bytes.slice(i, i+16);
+    const hex = row.join(' ').padEnd(47, ' ');
+    const ascii = row.map(b => { const c = parseInt(b,16); return c>=32&&c<127 ? String.fromCharCode(c) : '.'; }).join('');
+    out += `${(i*1).toString(16).padStart(4,'0')}  ${hex}  |${ascii}|\n`;
+  }
+  return out;
+}
+
+function closeModal() { document.getElementById('alertModal').classList.remove('open'); }
+function escalateAlert(id) { const a = alerts.find(x=>x.id===id); if(a) a.status='Escalated'; closeModal(); renderAlertTable(); }
+function dismissAlert(id) { const a = alerts.find(x=>x.id===id); if(a) a.status='False Positive'; closeModal(); renderAlertTable(); updateStats(); }
+
+// ═══════════════════════════════════════════════════════
+// LIVE LOG
+// ═══════════════════════════════════════════════════════
+
+function logEvent(type, msg) {
+  if (logPaused) return;
+  const el = document.getElementById('liveLog');
+  if (!el) return;
+  const ts = new Date().toISOString().slice(11,19);
+  const line = document.createElement('div');
+  line.className = 'log-line';
+  line.innerHTML = `<span class="log-ts">${ts}</span><span class="log-msg ${type}">${msg}</span>`;
+  el.prepend(line);
+  while (el.children.length > 80) el.lastChild.remove();
+}
+
+function toggleLogPause() {
+  logPaused = !logPaused;
+  document.getElementById('pauseLogBtn').textContent = logPaused ? 'Resume' : 'Pause';
+}
+function clearLog() { document.getElementById('liveLog').innerHTML = ''; }
+
+// ═══════════════════════════════════════════════════════
+// NETWORK TOPOLOGY
+// ═══════════════════════════════════════════════════════
+
+function drawTopology() {
+  const svg = document.getElementById('topoSvg');
+  const nodes = [
+    { id:'internet', label:'Internet', x:280, y:20, color:'#334155', shape:'diamond' },
+    { id:'fw', label:'FW-DMZ\n192.168.40.1', x:280, y:70, color:'#1e5f8a', shape:'rect' },
+    { id:'jump', label:'JUMP-SRV\n192.168.40.10', x:400, y:70, color:'#1e5f8a', shape:'rect' },
+    { id:'scada', label:'SCADA-SRV\n192.168.20.50', x:150, y:140, color:'#1a5c3a', shape:'rect' },
+    { id:'hmi1', label:'HMI-01\n192.168.20.10', x:300, y:140, color:'#1a5c3a', shape:'rect' },
+    { id:'hmi2', label:'HMI-02\n192.168.20.12', x:450, y:140, color:'#1a5c3a', shape:'rect' },
+    { id:'plc1', label:'PLC-01\n192.168.10.5', x:160, y:230, color:'#6b2020', shape:'rect' },
+    { id:'plc2', label:'PLC-02\n192.168.10.6', x:300, y:230, color:'#1a5c3a', shape:'rect' },
+    { id:'rtu', label:'RTU-01\n192.168.10.20', x:440, y:230, color:'#1a5c3a', shape:'rect' },
+    { id:'attacker', label:'ATTACKER\n192.168.50.99', x:30, y:140, color:'#6b1818', shape:'rect' },
+  ];
+  const edges = [
+    ['internet','fw'], ['fw','jump'], ['fw','scada'], ['fw','hmi1'], ['fw','hmi2'],
+    ['jump','hmi2'], ['scada','plc1'], ['hmi1','plc1'], ['hmi1','plc2'], ['hmi2','rtu'],
+    ['attacker','fw','attack'], ['attacker','plc1','attack'],
+  ];
+
+  let html = `<defs>
+    <marker id="arr" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#2d3f5c"/>
+    </marker>
+    <marker id="arrRed" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#ff3b5c"/>
+    </marker>
+  </defs>`;
+
+  // Zone bands
+  html += `<rect x="0" y="5" width="560" height="50" rx="3" fill="rgba(30,94,138,0.08)" stroke="#1e3a5c" stroke-width="0.5"/>`;
+  html += `<rect x="0" y="60" width="560" height="60" rx="3" fill="rgba(30,94,138,0.06)" stroke="#1e3a5c" stroke-width="0.5"/>`;
+  html += `<rect x="0" y="125" width="560" height="70" rx="3" fill="rgba(26,92,58,0.08)" stroke="#1a5c3a" stroke-width="0.5"/>`;
+  html += `<rect x="0" y="200" width="560" height="65" rx="3" fill="rgba(26,92,58,0.06)" stroke="#1a5c3a" stroke-width="0.5"/>`;
+  html += `<text x="4" y="20" fill="#1e3a5c" font-size="8" font-family="Share Tech Mono">ENTERPRISE / WAN</text>`;
+  html += `<text x="4" y="80" fill="#1e5f8a" font-size="8" font-family="Share Tech Mono">DMZ</text>`;
+  html += `<text x="4" y="148" fill="#1a5c3a" font-size="8" font-family="Share Tech Mono">LEVEL 2 – SCADA / HMI</text>`;
+  html += `<text x="4" y="220" fill="#1a5c3a" font-size="8" font-family="Share Tech Mono">LEVEL 1 – PLC / RTU</text>`;
+
+  // Edges
+  edges.forEach(([from, to, type]) => {
+    const f = nodes.find(n=>n.id===from), t = nodes.find(n=>n.id===to);
+    if (!f||!t) return;
+    const color = type==='attack' ? '#ff3b5c' : '#2d3f5c';
+    const marker = type==='attack' ? 'arrRed' : 'arr';
+    html += `<line x1="${f.x}" y1="${f.y+12}" x2="${t.x}" y2="${t.y-12}" stroke="${color}" stroke-width="${type==='attack'?1.5:0.8}" marker-end="url(#${marker})" stroke-dasharray="${type==='attack'?'4,3':''}"/>`;
+  });
+
+  // Nodes
+  nodes.forEach(n => {
+    const w = 80, h = 24;
+    const isAttack = n.id === 'attacker';
+    const isAlert = n.id === 'plc1';
+    const fill = n.color;
+    const stroke = isAttack ? '#ff3b5c' : isAlert ? '#ff3b5c80' : '#2d5a8a';
+    html += `<g onclick="nodeClick('${n.id}')" style="cursor:pointer">
+      <rect x="${n.x - w/2}" y="${n.y - h/2}" width="${w}" height="${h}" rx="3" fill="${fill}" stroke="${stroke}" stroke-width="${isAttack||isAlert?1.5:0.8}"/>
+      <text x="${n.x}" y="${n.y - 4}" text-anchor="middle" fill="#e2e8f0" font-size="7" font-family="Share Tech Mono">${n.label.split('\n')[0]}</text>
+      <text x="${n.x}" y="${n.y + 6}" text-anchor="middle" fill="#64748b" font-size="6" font-family="Share Tech Mono">${n.label.split('\n')[1]||''}</text>
+    </g>`;
+    if (isAttack) {
+      html += `<text x="${n.x}" y="${n.y - h/2 - 4}" text-anchor="middle" fill="#ff3b5c" font-size="9" font-family="Share Tech Mono">⚡ ATTACKER</text>`;
+    }
+  });
+
+  svg.innerHTML = html;
+}
+
+function nodeClick(id) {
+  showToast('info', `Node: ${id}`, 'See Asset Inventory for details');
+}
+function resetTopology() { drawTopology(); }
+
+// ═══════════════════════════════════════════════════════
+// PCAP
+// ═══════════════════════════════════════════════════════
+
+const PCAP_TEMPLATES = [
+  { src:'192.168.30.5', dst:'192.168.10.5', proto:'Modbus', len:66, func:'FC 03 Read Holding Regs', info:'Normal poll', cls:'pcap-modbus' },
+  { src:'192.168.30.5', dst:'192.168.10.5', proto:'Modbus', len:66, func:'FC 01 Read Coils', info:'Normal poll', cls:'pcap-modbus' },
+  { src:'192.168.20.10', dst:'192.168.10.6', proto:'S7Comm', len:89, func:'Read SZL', info:'CPU state query', cls:'pcap-normal' },
+  { src:'192.168.20.12', dst:'192.168.10.20', proto:'DNP3', len:48, func:'Class 0 Poll', info:'Normal telemetry', cls:'pcap-dnp3' },
+  { src:'192.168.50.99', dst:'192.168.10.5', proto:'Modbus', len:66, func:'FC 05 Write Coil!', info:'⚠ UNAUTHORIZED WRITE', cls:'pcap-suspicious' },
+  { src:'192.168.50.99', dst:'192.168.10.5', proto:'Modbus', len:66, func:'FC 0F Multi Coil Write!', info:'⚡ CRITICAL – BULK WRITE', cls:'pcap-suspicious' },
+  { src:'192.168.30.5', dst:'192.168.10.5', proto:'EtherNet/IP', len:72, func:'CIP Get Attribute', info:'Normal status read', cls:'pcap-normal' },
+  { src:'192.168.50.99', dst:'192.168.10.20', proto:'DNP3', len:48, func:'FC 0D Warm Restart!', info:'⚠ UNAUTHORIZED RESTART', cls:'pcap-suspicious' },
+];
+
+function generatePacket() {
+  const t = PCAP_TEMPLATES[Math.floor(Math.random() * PCAP_TEMPLATES.length)];
+  return { ...t, num: ++pcapCounter, ts: new Date().toISOString().slice(11,23) };
+}
+
+function renderPcapRow(p) {
+  const tbody = document.getElementById('pcapTbody');
+  if (!tbody) return;
+  const row = document.createElement('tr');
+  row.className = p.cls;
+  row.innerHTML = `
+    <td style="color:var(--text-muted)">${p.num}</td>
+    <td style="font-family:var(--mono);font-size:10px;color:var(--text-muted)">${p.ts}</td>
+    <td style="font-family:var(--mono);font-size:11px;color:var(--accent-cyan)">${p.src}</td>
+    <td style="font-family:var(--mono);font-size:11px;color:var(--accent-cyan)">${p.dst}</td>
+    <td><span class="proto-tag">${p.proto}</span></td>
+    <td style="font-family:var(--mono);font-size:10px">${p.len}</td>
+    <td style="font-family:var(--mono);font-size:11px;color:${p.cls==='pcap-suspicious'?'var(--severity-critical)':'var(--text-secondary)'}">${p.func}</td>
+    <td style="font-size:11px;color:var(--text-secondary)">${p.info}</td>
+  `;
+  row.onclick = () => decodePacket(p);
+  tbody.prepend(row);
+  while (tbody.children.length > 100) tbody.lastChild.remove();
+}
+
+function decodePacket(p) {
+  const dec = document.getElementById('protoDecoder');
+  const fields = getProtocolFields(p);
+  dec.innerHTML = `<div class="proto-fields">${fields.map(f => `
+    <div class="proto-field-row">
+      <div class="proto-field-name">${f.name}</div>
+      <div class="proto-field-val ${f.suspicious?'suspicious':f.warn?'warn':''}">${f.val}</div>
+    </div>
+  `).join('')}</div>`;
+  document.getElementById('hexDump').textContent = generateHex(p.proto);
+}
+
+function getProtocolFields(p) {
+  if (p.proto === 'Modbus') {
+    const isSusp = p.cls === 'pcap-suspicious';
+    return [
+      { name: 'Transaction ID', val: '0x0001' },
+      { name: 'Protocol ID', val: '0x0000 (Modbus)' },
+      { name: 'Length', val: `${p.len - 6} bytes` },
+      { name: 'Unit ID', val: '0x01' },
+      { name: 'Function Code', val: p.func.includes('0F') ? '0x0F (Write Multi Coils)' : p.func.includes('05') ? '0x05 (Write Single Coil)' : '0x03 (Read Holding Regs)', suspicious: isSusp, warn: false },
+      { name: 'Starting Address', val: '0x0001', warn: isSusp },
+      { name: 'Quantity', val: isSusp ? '0x0040 (64 coils)' : '0x001F', suspicious: isSusp },
+      { name: 'Source IP', val: p.src, suspicious: p.src === '192.168.50.99' },
+      { name: 'Dst Port', val: '502 (Modbus)' },
+    ];
+  }
+  if (p.proto === 'DNP3') {
+    return [
+      { name: 'Start Bytes', val: '0x0564' },
+      { name: 'Master Address', val: '0x0001', suspicious: p.cls==='pcap-suspicious' },
+      { name: 'Destination', val: '0x0003 (RTU-01)' },
+      { name: 'Function Code', val: p.cls==='pcap-suspicious' ? '0x0D (Warm Restart)' : '0x81 (Response)', suspicious: p.cls==='pcap-suspicious' },
+      { name: 'Application Control', val: '0xC0' },
+      { name: 'Source IP', val: p.src, suspicious: p.src==='192.168.50.99' },
+    ];
+  }
+  return [
+    { name: 'Source IP', val: p.src },
+    { name: 'Destination IP', val: p.dst },
+    { name: 'Protocol', val: p.proto },
+    { name: 'Length', val: p.len + ' bytes' },
+    { name: 'Function', val: p.func },
+  ];
+}
+
+function toggleCapture() {
+  captureActive = !captureActive;
+  document.getElementById('captureBtn').textContent = captureActive ? '⏹ Stop Capture' : '▶ Start Capture';
+}
+function clearPcap() { document.getElementById('pcapTbody').innerHTML = ''; pcapCounter = 0; }
+
+// ═══════════════════════════════════════════════════════
+// RULES
+// ═══════════════════════════════════════════════════════
+
+rulesList = [...RULES];
+
+function renderRuleList() {
+  const el = document.getElementById('ruleList');
+  if (!el) return;
+  el.innerHTML = rulesList.map((r,i) => `
+    <div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:10px;">
+      <div style="flex:1">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+          <span style="font-family:var(--mono);font-size:11px;color:${r.enabled?'var(--text-primary)':'var(--text-muted)'};">${r.name}</span>
+          <span class="sev-badge sev-${r.severity}">${r.severity}</span>
+          <span class="proto-tag">${r.proto}</span>
+        </div>
+        <div style="font-size:10px;color:var(--text-muted);font-family:var(--mono)">SID: ${r.sid} | Hits: <span style="color:var(--accent-green)">${r.hits}</span></div>
+        <div style="font-size:10px;color:var(--text-secondary);margin-top:2px">${r.desc}</div>
+      </div>
+      <button class="btn-xs ${r.enabled?'active':''}" onclick="toggleRule(${i})">${r.enabled?'ON':'OFF'}</button>
+    </div>
+  `).join('');
+}
+
+function toggleRule(i) {
+  rulesList[i].enabled = !rulesList[i].enabled;
+  renderRuleList();
+}
+
+function bumpRuleHit(ruleName) {
+  const r = rulesList.find(x => x.name === ruleName || ruleName.includes(x.name.slice(0,12)));
+  if (r) { r.hits++; renderRuleList(); }
+}
+
+function loadTemplateRule() {
+  const templates = [
+    `alert tcp any any -> 192.168.10.0/24 502 (msg:"Modbus Force Listen Only Mode - DoS Attack"; content:"|00 00 00 00|"; depth:4; content:"|08 00 04|"; offset:7; depth:3; classtype:denial-of-service; priority:1; sid:9000013; rev:1;)`,
+    `alert tcp 192.168.50.0/24 any -> 192.168.10.0/24 102 (msg:"S7comm Connection from Unauthorized Subnet"; flow:to_server; content:"|03 00|"; depth:2; classtype:policy-violation; priority:1; sid:9000014; rev:1;)`,
+    `alert udp any any -> 192.168.0.0/16 20000 (msg:"DNP3 Broadcast - Possible Replay Attack"; content:"|05 64|"; depth:2; threshold:type threshold,track by_src,count 5,seconds 60; sid:9000015; rev:1;)`,
+  ];
+  document.getElementById('ruleEditor').value = templates[Math.floor(Math.random()*templates.length)];
+  document.getElementById('ruleValidation').textContent = '✅ Template loaded — review and click Add Rule';
+  document.getElementById('ruleValidation').style.color = 'var(--accent-green)';
+}
+
+function saveRule() {
+  const txt = document.getElementById('ruleEditor').value.trim();
+  const sidMatch = txt.match(/sid:(\d+)/);
+  const msgMatch = txt.match(/msg:"([^"]+)"/);
+  if (!sidMatch || !msgMatch) {
+    document.getElementById('ruleValidation').textContent = '❌ Invalid rule — must contain msg and sid fields';
+    document.getElementById('ruleValidation').style.color = 'var(--severity-critical)';
+    return;
+  }
+  const protoMatch = txt.match(/alert (tcp|udp|any)/i);
+  rulesList.unshift({
+    sid: sidMatch[1], name: msgMatch[1], proto: protoMatch ? protoMatch[1].toUpperCase() : 'TCP',
+    severity: 'medium', enabled: true, hits: 0, desc: 'User-defined rule'
+  });
+  renderRuleList();
+  document.getElementById('ruleValidation').textContent = `✅ Rule SID:${sidMatch[1]} added — ${rulesList.length} total rules active`;
+  document.getElementById('ruleValidation').style.color = 'var(--accent-green)';
+  document.getElementById('statRules').textContent = rulesList.filter(r=>r.enabled).length;
+  showToast('ok', 'Rule Added', `SID: ${sidMatch[1]} — ${msgMatch[1]}`);
+}
+
+// ═══════════════════════════════════════════════════════
+// ASSETS
+// ═══════════════════════════════════════════════════════
+
+function renderAssets() {
+  const el = document.getElementById('assetGrid');
+  if (!el) return;
+  el.innerHTML = ASSETS.map(a => `
+    <div class="asset-card ${a.status==='alert'?'compromised':''}" onclick="showToast('info','${a.name}','${a.ip} — ${a.vendor} ${a.model}')">
+      <div class="asset-icon">${a.icon}</div>
+      <div class="asset-name">${a.name}</div>
+      <div class="asset-type">${a.type}</div>
+      <div class="asset-ip">${a.ip}</div>
+      <div style="font-size:10px;color:var(--text-muted);margin-top:4px">${a.vendor} ${a.model} | ${a.firmware}</div>
+      <div class="asset-status">
+        <div class="dot-${a.status}"></div>
+        <span style="color:${a.status==='ok'?'var(--accent-green)':a.status==='alert'?'var(--severity-critical)':'var(--severity-medium)'};font-size:10px;">
+          ${a.status === 'ok' ? 'Normal' : a.status === 'alert' ? 'ALERT — Suspicious Activity' : 'Warning'}
+        </span>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ═══════════════════════════════════════════════════════
+// MITRE
+// ═══════════════════════════════════════════════════════
+
+function renderMitre() {
+  const el = document.getElementById('mitreGrid');
+  if (!el) return;
+  el.innerHTML = Object.entries(MITRE_MATRIX).map(([tactic, techs]) => `
+    <div class="mitre-tactic">
+      <div class="mitre-tactic-name">${tactic}</div>
+      ${techs.map(t => `
+        <div class="mitre-tech ${MITRE_HIT.includes(t)?'hit':MITRE_PARTIAL.includes(t)?'medium':''}" 
+             title="${t}" onclick="showToast('info','${t.split(' ')[0]}','${tactic} tactic')">
+          ${t.length > 22 ? t.slice(0,22)+'…' : t}
+        </div>
+      `).join('')}
+    </div>
+  `).join('');
+}
+
+// ═══════════════════════════════════════════════════════
+// SIEM
+// ═══════════════════════════════════════════════════════
+
+const SIEM_TEMPLATES = {
+  coilWrite: `index=ot_traffic sourcetype=modbus\n| where function_code IN (5,6,15,16)\n| stats count by src_ip, dst_ip, function_code\n| where count > 10\n| sort -count`,
+  bruteForce: `index=ot_traffic sourcetype=*\n| where dest_port=44818 OR dest_port=102 OR dest_port=502\n| stats count by src_ip, dest_port\n| where count > 50\n| eval risk=if(count>200,"CRITICAL","HIGH")\n| table src_ip, dest_port, count, risk`,
+  scanDetect: `index=ot_traffic\n| stats dc(dest_port) as unique_ports by src_ip\n| where unique_ports > 10\n| join src_ip [search index=asset_db | table ip, asset_name]\n| eval threat_level=if(unique_ports>50,"CRITICAL","HIGH")`,
+  baseline: `index=ot_traffic sourcetype=modbus earliest=-1h\n| timechart span=5m count as current_rate\n| appendcols [search index=ot_baseline | table expected_rate]\n| eval deviation=round((current_rate-expected_rate)/expected_rate*100,1)\n| where deviation > 50`,
+};
+
+function loadQueryTemplate(name) {
+  document.getElementById('siemQuery').value = SIEM_TEMPLATES[name] || '';
+}
+
+function runSIEMQuery() {
+  const q = document.getElementById('siemQuery').value;
+  const el = document.getElementById('siemResults');
+
+  // Simulate results based on query content
+  const rows = generateSIEMResults(q);
+  el.innerHTML = `
+    <div style="font-family:var(--mono);font-size:11px;color:var(--text-secondary);margin-bottom:10px;">
+      ✅ Query returned ${rows.length} results in ${(Math.random()*0.8+0.1).toFixed(2)}s
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="alert-table">
+        <thead><tr>${Object.keys(rows[0]||{}).map(k=>`<th>${k}</th>`).join('')}</tr></thead>
+        <tbody>${rows.map(r=>`<tr>${Object.values(r).map(v=>`<td style="font-family:var(--mono);font-size:11px">${v}</td>`).join('')}</tr>`).join('')}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function generateSIEMResults(q) {
+  if (q.includes('function_code')) {
+    return [
+      { src_ip:'192.168.50.99', dst_ip:'192.168.10.5', function_code:'0x0F', count:147 },
+      { src_ip:'192.168.50.99', dst_ip:'192.168.10.5', function_code:'0x05', count:83 },
+      { src_ip:'192.168.30.5', dst_ip:'192.168.10.5', function_code:'0x03', count:12 },
+    ];
+  }
+  if (q.includes('dest_port')) {
+    return [
+      { src_ip:'192.168.50.99', dest_port:'502', count:230, risk:'CRITICAL' },
+      { src_ip:'192.168.50.99', dest_port:'44818', count:15, risk:'HIGH' },
+    ];
+  }
+  if (q.includes('unique_ports')) {
+    return [
+      { src_ip:'192.168.50.99', unique_ports:42, asset_name:'(unknown)', threat_level:'CRITICAL' },
+    ];
+  }
+  return [
+    { ts: new Date().toISOString().slice(0,19), src:'192.168.50.99', event:'Anomalous traffic detected', count:37 },
+    { ts: new Date().toISOString().slice(0,19), src:'192.168.30.5', event:'Normal baseline traffic', count:8 },
+  ];
+}
+
+// ═══════════════════════════════════════════════════════
+// INCIDENT REPORT
+// ═══════════════════════════════════════════════════════
+
+function generateReport() {
+  const id = document.getElementById('incidentId').value;
+  const title = document.getElementById('incidentTitle').value;
+  const sev = document.getElementById('incidentSeverity').value;
+  const status = document.getElementById('incidentStatus').value;
+  const assets = document.getElementById('incidentAssets').value;
+  const mitre = document.getElementById('incidentMitre').value;
+  const desc = document.getElementById('incidentDesc').value;
+  const resp = document.getElementById('incidentResponse').value;
+  const analyst = document.getElementById('analystName').value || 'SOC Analyst (Student)';
+  const ts = new Date().toISOString().replace('T',' ').slice(0,19);
+
+  document.getElementById('reportPreview').innerHTML = `
+<span style="color:var(--severity-critical)">╔══════════════════════════════════════════╗
+║     OT/ICS INCIDENT REPORT               ║
+╚══════════════════════════════════════════╝</span>
+
+<span style="color:var(--accent-cyan)">INCIDENT ID   :</span> ${id}
+<span style="color:var(--accent-cyan)">GENERATED     :</span> ${ts} UTC
+<span style="color:var(--accent-cyan)">ANALYST       :</span> ${analyst}
+
+<span style="color:var(--accent-amber)">━━━ CLASSIFICATION ━━━━━━━━━━━━━━━━━━━━━━</span>
+TITLE    : ${title}
+SEVERITY : <span style="color:var(--severity-critical)">${sev}</span>
+STATUS   : ${status}
+
+<span style="color:var(--accent-amber)">━━━ AFFECTED ASSETS ━━━━━━━━━━━━━━━━━━━━━</span>
+${assets}
+
+<span style="color:var(--accent-amber)">━━━ MITRE ATT&CK ICS MAPPING ━━━━━━━━━━━</span>
+${mitre}
+
+<span style="color:var(--accent-amber)">━━━ EVENT DESCRIPTION ━━━━━━━━━━━━━━━━━━━</span>
+${desc.replace(/\n/g,'\n')}
+
+<span style="color:var(--accent-amber)">━━━ RESPONSE ACTIONS ━━━━━━━━━━━━━━━━━━━━</span>
+${resp.replace(/\n/g,'\n')}
+
+<span style="color:var(--accent-amber)">━━━ REFERENCES ━━━━━━━━━━━━━━━━━━━━━━━━━</span>
+• CISA ICS-CERT Advisory
+• NIST SP 800-82 Rev.3
+• MITRE ATT&CK for ICS: ics.mitre.org
+
+<span style="color:var(--text-muted)">— Report generated by ELITEWOLF-OT Student Lab —</span>
+  `;
+  showToast('ok', 'Report Generated', `${id} — ready for download`);
+}
+
+// ═══════════════════════════════════════════════════════
+// ATTACK SCENARIOS
+// ═══════════════════════════════════════════════════════
+
+function renderScenarios() {
+  const el = document.getElementById('scenarioGrid');
+  if (!el) return;
+  el.innerHTML = ATTACK_SCENARIOS.map(s => `
+    <div class="scenario-btn" onclick="runScenario('${s.id}')">
+      <div class="s-name">${s.name}</div>
+      <div class="s-desc">${s.desc}</div>
+      <div class="s-tags">
+        ${s.tags.map(t=>`<span class="s-tag ${t}">${t.toUpperCase()}</span>`).join('')}
+        <span class="sev-badge sev-${s.severity}" style="font-size:9px">${s.severity}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function runScenario(id) {
+  const sc = ATTACK_SCENARIOS.find(s => s.id === id);
+  if (!sc) return;
+
+  const panel = document.getElementById('attackProgressPanel');
+  const content = document.getElementById('attackProgressContent');
+  panel.style.display = '';
+  content.innerHTML = `
+    <div style="font-family:var(--mono);font-size:12px;color:var(--accent-amber);margin-bottom:12px">
+      ⚡ Running: ${sc.name}
+    </div>
+    <div style="margin-bottom:10px;">
+      <div class="progress-bar-track">
+        <div class="progress-bar-fill" id="simProgress" style="width:0%;background:var(--accent-amber)"></div>
+      </div>
+    </div>
+    <div id="simLog" style="font-family:var(--mono);font-size:11px;line-height:2;"></div>
+  `;
+
+  sc.steps.forEach((step, i) => {
+    setTimeout(() => {
+      const logEl = document.getElementById('simLog');
+      if (!logEl) return;
+      const pct = Math.round((i+1)/sc.steps.length*100);
+      const progressEl = document.getElementById('simProgress');
+      if (progressEl) progressEl.style.width = pct + '%';
+
+      const color = step.type==='alert' ? 'var(--severity-critical)' : step.type==='warn' ? 'var(--severity-medium)' : 'var(--accent-green)';
+      const icon = step.type==='alert' ? '🚨' : step.type==='warn' ? '⚠️' : '✅';
+      const ts = new Date().toISOString().slice(11,19);
+      logEl.innerHTML += `<div><span style="color:var(--text-muted)">${ts}</span> ${icon} <span style="color:${color}">${step.msg}</span></div>`;
+
+      logEvent(step.type, step.msg);
+
+      if (i === sc.steps.length - 1) {
+        injectAlert(sc.alertTemplate);
+        setTimeout(() => {
+          const logEl2 = document.getElementById('simLog');
+          if (logEl2) logEl2.innerHTML += `<div style="margin-top:8px;color:var(--accent-green);font-family:var(--mono)">✅ Scenario complete — Check Alert Queue for detected events</div>`;
+        }, 200);
+      }
+    }, step.delay);
+  });
+
+  showToast('warn', `Scenario: ${sc.name}`, 'Injecting synthetic attack traffic…');
+}
+
+function filterZone(z) {
+  document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
+  event.target.closest('.sidebar-item').classList.add('active');
+}
+
+function filterProto(p) {
+  currentAlertFilter = 'all';
+  showSection('alerts');
+  document.getElementById('alertSearch').value = p;
+  renderAlertTable();
+}
+
+// ═══════════════════════════════════════════════════════
+// TRAFFIC SIMULATION
+// ═══════════════════════════════════════════════════════
+
+function startTrafficSimulation() {
+  setInterval(() => {
+    // Update PPS
+    trafficPPS = Math.floor(120 + Math.random()*80);
+    trafficHistory.push(trafficPPS);
+    trafficHistory.shift();
+    document.getElementById('statPPS').textContent = trafficPPS;
+
+    // Generate PCAP packet
+    if (captureActive && Math.random() > 0.3) {
+      const p = generatePacket();
+      renderPcapRow(p);
+      if (p.cls === 'pcap-suspicious') {
+        logEvent('warn', `[PCAP] ${p.proto} ${p.func} :: ${p.src} → ${p.dst}`);
+      } else {
+        logEvent('ok', `[PCAP] ${p.proto} ${p.func} :: ${p.src} → ${p.dst}`);
+      }
+    }
+
+    // Occasional normal log
+    const normalMsgs = [
+      '[Modbus] Normal poll from ENG-WS-01 to PLC-01 (FC03)',
+      '[DNP3] Class 0 telemetry from RTU-01 to SCADA-SRV',
+      '[OPC-UA] Data subscription update from HIST-SRV',
+      '[EtherNet/IP] CIP heartbeat — PLC-01 online',
+      '[S7Comm] CPU info request — PLC-02 RUN mode',
+    ];
+    if (Math.random() > 0.6) logEvent('ok', normalMsgs[Math.floor(Math.random()*normalMsgs.length)]);
+
+    // Occasional spontaneous alert
+    if (Math.random() > 0.97) {
+      const randAlert = ATTACK_SCENARIOS[Math.floor(Math.random()*ATTACK_SCENARIOS.length)];
+      injectAlert(randAlert.alertTemplate);
+    }
+
+    drawTrafficChart();
+  }, 1500);
+}
+
+// ═══════════════════════════════════════════════════════
+// CHARTS
+// ═══════════════════════════════════════════════════════
+
+let trafficCtx, trendCtx, protoCtx;
+
+function initTrafficChart() {
+  const canvas = document.getElementById('trafficChart');
+  if (!canvas) return;
+  trafficCtx = canvas.getContext('2d');
+  drawTrafficChart();
+}
+
+function drawTrafficChart() {
+  const canvas = document.getElementById('trafficChart');
+  if (!canvas || !trafficCtx) return;
+  const w = canvas.width, h = canvas.height;
+  trafficCtx.clearRect(0, 0, w, h);
+
+  // Background grid
+  trafficCtx.strokeStyle = '#1e293b';
+  trafficCtx.lineWidth = 0.5;
+  for (let y = 0; y < h; y += 40) {
+    trafficCtx.beginPath(); trafficCtx.moveTo(0,y); trafficCtx.lineTo(w,y); trafficCtx.stroke();
+  }
+
+  const max = Math.max(...trafficHistory, 1);
+  const step = w / (trafficHistory.length - 1);
+
+  // Fill
+  trafficCtx.beginPath();
+  trafficHistory.forEach((v, i) => {
+    const x = i * step, y = h - (v / max) * (h - 10);
+    i === 0 ? trafficCtx.moveTo(x, y) : trafficCtx.lineTo(x, y);
+  });
+  trafficCtx.lineTo(w, h); trafficCtx.lineTo(0, h); trafficCtx.closePath();
+  const grad = trafficCtx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, 'rgba(0,212,255,0.3)');
+  grad.addColorStop(1, 'rgba(0,212,255,0)');
+  trafficCtx.fillStyle = grad;
+  trafficCtx.fill();
+
+  // Line
+  trafficCtx.beginPath();
+  trafficCtx.strokeStyle = '#00d4ff';
+  trafficCtx.lineWidth = 1.5;
+  trafficHistory.forEach((v, i) => {
+    const x = i * step, y = h - (v / max) * (h - 10);
+    i === 0 ? trafficCtx.moveTo(x, y) : trafficCtx.lineTo(x, y);
+  });
+  trafficCtx.stroke();
+
+  // Label
+  trafficCtx.fillStyle = '#64748b';
+  trafficCtx.font = '10px Share Tech Mono';
+  trafficCtx.fillText(`${trafficPPS} pkt/s`, 6, 14);
+}
+
+function initTrendChart() {
+  const canvas = document.getElementById('trendChart');
+  if (!canvas) return;
+  trendCtx = canvas.getContext('2d');
+  const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const data = [8, 12, 5, 19, 24, 7, 3];
+  const w = canvas.width, h = canvas.height;
+  const barW = w / days.length - 8;
+  const max = Math.max(...data);
+
+  trendCtx.clearRect(0, 0, w, h);
+  days.forEach((d, i) => {
+    const barH = (data[i] / max) * (h - 30);
+    const x = i * (w / days.length) + 4;
+    const y = h - 20 - barH;
+    trendCtx.fillStyle = data[i] > 15 ? 'rgba(255,59,92,0.7)' : 'rgba(0,212,255,0.5)';
+    trendCtx.fillRect(x, y, barW, barH);
+    trendCtx.fillStyle = '#64748b';
+    trendCtx.font = '9px Share Tech Mono';
+    trendCtx.fillText(d, x + 2, h - 6);
+    trendCtx.fillStyle = '#94a3b8';
+    trendCtx.fillText(data[i], x + 4, y - 4);
+  });
+}
+
+function initProtoChart() {
+  const canvas = document.getElementById('protoChart');
+  if (!canvas) return;
+  protoCtx = canvas.getContext('2d');
+  const protos = [
+    { name: 'Modbus', val: 58, color: '#00d4ff' },
+    { name: 'DNP3', val: 22, color: '#a855f7' },
+    { name: 'EtherNet/IP', val: 12, color: '#ff6b00' },
+    { name: 'S7Comm', val: 5, color: '#ff3b5c' },
+    { name: 'OPC-UA', val: 3, color: '#00ff88' },
+  ];
+  const w = canvas.width, h = canvas.height;
+  const cx = w * 0.35, cy = h / 2, r = Math.min(cx, cy) - 20;
+  let angle = -Math.PI / 2;
+
+  protoCtx.clearRect(0, 0, w, h);
+  protos.forEach(p => {
+    const slice = (p.val / 100) * 2 * Math.PI;
+    protoCtx.beginPath();
+    protoCtx.moveTo(cx, cy);
+    protoCtx.arc(cx, cy, r, angle, angle + slice);
+    protoCtx.closePath();
+    protoCtx.fillStyle = p.color + '99';
+    protoCtx.strokeStyle = p.color;
+    protoCtx.lineWidth = 1;
+    protoCtx.fill(); protoCtx.stroke();
+    angle += slice;
+  });
+
+  // Legend
+  protos.forEach((p, i) => {
+    const x = w * 0.62, y = 30 + i * 28;
+    protoCtx.fillStyle = p.color;
+    protoCtx.fillRect(x, y, 12, 12);
+    protoCtx.fillStyle = '#94a3b8';
+    protoCtx.font = '10px Share Tech Mono';
+    protoCtx.fillText(`${p.name} (${p.val}%)`, x + 16, y + 10);
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// TOAST NOTIFICATIONS
+// ═══════════════════════════════════════════════════════
+
+function showToast(type, title, msg) {
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  const icons = { critical:'🚨', high:'⚠️', medium:'⚠️', warn:'⚠️', ok:'✅', info:'ℹ️' };
+  const cls = type === 'critical' || type === 'high' ? 'critical' : type === 'ok' ? 'ok' : 'warn';
+  toast.className = `toast ${cls}`;
+  toast.innerHTML = `
+    <div class="toast-icon">${icons[type]||'ℹ️'}</div>
+    <div class="toast-content">
+      <div class="toast-title">${title}</div>
+      <div class="toast-msg">${msg}</div>
+    </div>
+  `;
+  container.appendChild(toast);
+  setTimeout(() => { toast.style.opacity='0'; toast.style.transition='opacity 0.3s'; setTimeout(()=>toast.remove(),300); }, 4000);
+}
+
+// ═══════════════════════════════════════════════════════
+// BOOT
+// ═══════════════════════════════════════════════════════
+
+window.addEventListener('load', init);
+</script>
+</body>
+</html>

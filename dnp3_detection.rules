@@ -1,0 +1,89 @@
+# ============================================================
+# ELITEWOLF-Style OT Threat Detection Rules — DNP3
+# Port: 20000 TCP/UDP | Used in: Electric, Water, Oil & Gas
+# Reference: CRASHOVERRIDE/Industroyer malware analysis
+# ============================================================
+
+# ── UNAUTHORIZED CONTROL OPERATIONS ─────────────────────────
+
+alert tcp any any -> $OT_NET 20000 (
+  msg:"OT-DNP3 Direct Operate Command from Unauthorized Source";
+  flow:to_server,established;
+  content:"|05 64|"; depth:2;
+  content:"|03|"; offset:12; depth:1;
+  classtype:protocol-command-decode;
+  priority:1;
+  metadata:protocol dnp3, tactic Impact, technique T0855;
+  sid:9001001; rev:2;
+)
+
+alert tcp any any -> $OT_NET 20000 (
+  msg:"OT-DNP3 Warm Restart - Denial of Control Attack";
+  flow:to_server,established;
+  content:"|05 64|"; depth:2;
+  content:"|0D|"; offset:12; depth:1;
+  threshold:type limit,track by_src,count 1,seconds 300;
+  classtype:denial-of-service;
+  priority:1;
+  metadata:protocol dnp3, tactic Impact, technique T0813, malware CRASHOVERRIDE;
+  sid:9001002; rev:2;
+)
+
+alert tcp any any -> $OT_NET 20000 (
+  msg:"OT-DNP3 Cold Restart - Device Shutdown Command";
+  flow:to_server,established;
+  content:"|05 64|"; depth:2;
+  content:"|0E|"; offset:12; depth:1;
+  classtype:denial-of-service;
+  priority:1;
+  metadata:protocol dnp3, tactic Impact, technique T0816, malware CRASHOVERRIDE;
+  sid:9001003; rev:2;
+)
+
+# ── RECONNAISSANCE ───────────────────────────────────────────
+
+alert tcp any any -> $OT_NET 20000 (
+  msg:"OT-DNP3 Class 0 Data Poll - Possible Asset Discovery";
+  flow:to_server,established;
+  content:"|05 64|"; depth:2;
+  threshold:type threshold,track by_src,count 30,seconds 60;
+  classtype:protocol-command-decode;
+  priority:3;
+  metadata:protocol dnp3, tactic Discovery, technique T0888;
+  sid:9001004; rev:1;
+)
+
+# ── CRASHOVERRIDE / INDUSTROYER PATTERNS ────────────────────
+
+alert tcp any any -> $OT_NET 20000 (
+  msg:"OT-DNP3 Select-Before-Operate Sequence - CRASHOVERRIDE Pattern";
+  flow:to_server,established;
+  content:"|05 64|"; depth:2;
+  content:"|03|"; offset:12; depth:1;
+  flowbits:set,dnp3.sbo;
+  classtype:protocol-command-decode;
+  priority:1;
+  metadata:protocol dnp3, tactic Impact, malware CRASHOVERRIDE INDUSTROYER;
+  sid:9001005; rev:2;
+)
+
+# ── POLICY VIOLATIONS ────────────────────────────────────────
+
+alert udp any any -> $OT_NET 20000 (
+  msg:"OT-DNP3 UDP Broadcast - Possible Replay Attack";
+  content:"|05 64|"; depth:2;
+  threshold:type threshold,track by_src,count 5,seconds 60;
+  classtype:policy-violation;
+  priority:2;
+  metadata:protocol dnp3, tactic Evasion;
+  sid:9001006; rev:1;
+)
+
+alert tcp $ENTERPRISE_NET any -> $OT_NET 20000 (
+  msg:"OT-DNP3 Connection from Enterprise Network - IT/OT Boundary Violation";
+  flow:to_server,established;
+  classtype:policy-violation;
+  priority:1;
+  metadata:protocol dnp3, tactic LateralMovement, technique T0866;
+  sid:9001007; rev:1;
+)
