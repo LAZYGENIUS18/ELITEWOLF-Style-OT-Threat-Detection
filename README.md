@@ -76,7 +76,7 @@ start index.html       # Windows
 xdg-open index.html    # Linux
 ```
 
-Or just **[click here to try the live demo →](https://YOUR_USERNAME.github.io/ot-threat-lab)**
+Or just **[click here to try the live demo →](https://LAZYGENIUS18.github.io/ot-threat-lab)**
 
 ---
 
