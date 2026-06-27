@@ -240,9 +240,8 @@ MIT License — free to use, modify, and share with attribution.
 
 ## 👤 Author
 
-**[Your Name]**
-- GitHub: [@YOUR_USERNAME](https://github.com/YOUR_USERNAME)
-- LinkedIn: [Your LinkedIn](https://linkedin.com/in/YOUR_PROFILE)
+**[LAZYGENIUS18]**
+- GitHub: [@LAZYGENIUS18](https://github.com/LAZYGENIUS18)
 
 *Built as a portfolio project for OT/ICS cybersecurity roles.*
 
